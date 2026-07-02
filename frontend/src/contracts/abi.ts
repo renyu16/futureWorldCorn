@@ -1,6 +1,33 @@
 export const CORN_TOKEN_ADDRESS = '0x...'
 export const PREDICTION_MARKET_ADDRESS = '0x...'
 
+export interface ContractAddresses {
+  cornToken: `0x${string}`
+  predictionMarket: `0x${string}`
+  oracleAdapter: `0x${string}`
+}
+
+export const DeployedAddresses: Record<number, ContractAddresses> = {
+  4801: {
+    cornToken: '0x...',
+    predictionMarket: '0x...',
+    oracleAdapter: '0x...',
+  },
+  480: {
+    cornToken: '0x...',
+    predictionMarket: '0x...',
+    oracleAdapter: '0x...',
+  },
+}
+
+export function getConfig(chainId: number): ContractAddresses {
+  const config = DeployedAddresses[chainId]
+  if (!config) {
+    throw new Error(`No deployment config found for chain ID ${chainId}`)
+  }
+  return config
+}
+
 export const cornTokenABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',

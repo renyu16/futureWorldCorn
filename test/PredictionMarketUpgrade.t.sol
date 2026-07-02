@@ -19,8 +19,8 @@ contract PredictionMarketV2 is PredictionMarket {
 contract PredictionMarketUpgradeTest is Test {
     CornToken token;
     PredictionMarket implementation;
-    PredictionMarket proxy;
     PredictionMarket wrapped;
+    address alice = address(0x1);
     address feeCollector = address(0x3);
 
     function setUp() public {
@@ -33,7 +33,6 @@ contract PredictionMarketUpgradeTest is Test {
             address(this)
         );
         ERC1967Proxy erc1967Proxy = new ERC1967Proxy(address(implementation), initData);
-        proxy = PredictionMarket(address(erc1967Proxy));
         wrapped = PredictionMarket(address(erc1967Proxy));
     }
 
@@ -54,5 +53,13 @@ contract PredictionMarketUpgradeTest is Test {
         PredictionMarketV2 upgraded = PredictionMarketV2(address(wrapped));
         assertEq(address(upgraded.token()), address(token));
         assertEq(upgraded.feeCollector(), feeCollector);
+        assertEq(upgraded.version(), "v2");
+    }
+
+    function test_UpgradeRevertsForNonOwner() public {
+        PredictionMarketV2 implV2 = new PredictionMarketV2();
+        vm.prank(alice);
+        vm.expectRevert();
+        wrapped.upgradeToAndCall(address(implV2), "");
     }
 }

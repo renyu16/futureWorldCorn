@@ -8,6 +8,8 @@ contract CornToken is ERC20, ERC20Permit, Ownable {
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**18;
     bool public mintLocked;
 
+    event MintLocked();
+
     constructor() ERC20("CornToken", "CORN") ERC20Permit("CornToken") Ownable(msg.sender) {
         _mint(msg.sender, MAX_SUPPLY);
     }
@@ -20,6 +22,7 @@ contract CornToken is ERC20, ERC20Permit, Ownable {
 
     function lockMint() external onlyOwner {
         mintLocked = true;
+        emit MintLocked();
     }
 
     function burn(uint256 amount) external {

@@ -1,8 +1,128 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/// @title PredictionMarket
-/// @notice Decentralized prediction market contract on World Chain
-contract PredictionMarket {
+contract PredictionMarket is Ownable2Step, ReentrancyGuard {
+    IERC20 public token;
+    uint16 public defaultFeeBps = 200;
+    address public feeCollector;
+    uint256 public marketCount;
 
+    enum Outcome { YES, NO }
+    enum MarketStatus { Open, Resolved }
+
+    struct Market {
+        string question;
+        uint128 outcomeYes;
+        uint128 outcomeNo;
+        uint40 deadline;
+        MarketStatus status;
+        bool result;
+        uint16 feeBps;
+    }
+
+    mapping(uint256 => Market) public markets;
+    mapping(uint256 => mapping(address => uint256)) public sharesYes;
+    mapping(uint256 => mapping(address => uint256)) public sharesNo;
+    mapping(uint256 => mapping(address => bool)) public claimed;
+
+    event MarketCreated(uint256 indexed id, string question, uint40 deadline);
+    event BetPlaced(uint256 indexed id, address indexed user, Outcome outcome, uint256 amount);
+    event MarketResolved(uint256 indexed id, bool result);
+    event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount);
+
+    constructor(address _token, address _feeCollector) Ownable(msg.sender) {
+        token = IERC20(_token);
+        feeCollector = _feeCollector;
+    }
+
+    function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external onlyOwner {
+        require(deadline > block.timestamp, "deadline in past");
+        require(feeBps <= 1000, "fee too high");
+
+        marketCount++;
+        Market storage m = markets[marketCount];
+        m.question = question;
+        m.deadline = deadline;
+        m.status = MarketStatus.Open;
+        m.feeBps = feeBps;
+
+        emit MarketCreated(marketCount, question, deadline);
+    }
+
+    function bet(uint256 marketId, Outcome outcome, uint256 amount) external nonReentrant {
+        Market storage m = markets[marketId];
+        require(m.status == MarketStatus.Open, "market not open");
+        require(block.timestamp < m.deadline, "betting closed");
+        require(amount > 0, "zero amount");
+
+        token.transferFrom(msg.sender, address(this), amount);
+
+        if (outcome == Outcome.YES) {
+            m.outcomeYes += uint128(amount);
+            sharesYes[marketId][msg.sender] += amount;
+        } else {
+            m.outcomeNo += uint128(amount);
+            sharesNo[marketId][msg.sender] += amount;
+        }
+
+        emit BetPlaced(marketId, msg.sender, outcome, amount);
+    }
+
+    function resolveMarket(uint256 marketId, bool result) external onlyOwner {
+        Market storage m = markets[marketId];
+        require(m.status == MarketStatus.Open, "already resolved");
+        require(block.timestamp >= m.deadline, "deadline not reached");
+
+        m.status = MarketStatus.Resolved;
+        m.result = result;
+
+        emit MarketResolved(marketId, result);
+    }
+
+    function claimReward(uint256 marketId) external nonReentrant {
+        Market storage m = markets[marketId];
+        require(m.status == MarketStatus.Resolved, "not resolved");
+        require(!claimed[marketId][msg.sender], "already claimed");
+
+        uint256 userShares;
+        uint256 losingPool;
+        uint256 winningPool;
+
+        if (m.result) {
+            userShares = sharesYes[marketId][msg.sender];
+            winningPool = m.outcomeYes;
+            losingPool = m.outcomeNo;
+        } else {
+            userShares = sharesNo[marketId][msg.sender];
+            winningPool = m.outcomeNo;
+            losingPool = m.outcomeYes;
+        }
+
+        require(userShares > 0, "no winnings");
+
+        claimed[marketId][msg.sender] = true;
+
+        uint256 fee = (losingPool * m.feeBps) / 10000;
+        uint256 rewardPool = losingPool - fee;
+        uint256 reward = (userShares * rewardPool) / winningPool;
+        reward += userShares;
+
+        if (fee > 0) {
+            token.transfer(feeCollector, fee);
+        }
+        token.transfer(msg.sender, reward);
+
+        emit RewardClaimed(marketId, msg.sender, reward);
+    }
+
+    function setDefaultFee(uint16 _feeBps) external onlyOwner {
+        defaultFeeBps = _feeBps;
+    }
+
+    function setFeeCollector(address _feeCollector) external onlyOwner {
+        feeCollector = _feeCollector;
+    }
 }

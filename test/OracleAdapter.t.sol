@@ -48,6 +48,7 @@ contract OracleAdapterTest is Test {
 
     function test_ResolveViaDataFeed() public {
         aggregator.setPrice(15000);
+        vm.prank(keeper);
         adapter.configureFeed(marketId, address(aggregator), 10000, true);
 
         vm.warp(DEADLINE + 1);

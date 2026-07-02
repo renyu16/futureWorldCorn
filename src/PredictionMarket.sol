@@ -3,8 +3,11 @@ pragma solidity ^0.8.26;
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract PredictionMarket is Ownable2Step, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     IERC20 public token;
     uint16 public defaultFeeBps = 200;
     address public feeCollector;
@@ -40,14 +43,15 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
 
     function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external onlyOwner {
         require(deadline > block.timestamp, "deadline in past");
-        require(feeBps <= 1000, "fee too high");
+        uint16 marketFee = feeBps == 0 ? defaultFeeBps : feeBps;
+        require(marketFee <= 1000, "fee too high");
 
         marketCount++;
         Market storage m = markets[marketCount];
         m.question = question;
         m.deadline = deadline;
         m.status = MarketStatus.Open;
-        m.feeBps = feeBps;
+        m.feeBps = marketFee;
 
         emit MarketCreated(marketCount, question, deadline);
     }
@@ -58,8 +62,6 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
         require(block.timestamp < m.deadline, "betting closed");
         require(amount > 0, "zero amount");
 
-        token.transferFrom(msg.sender, address(this), amount);
-
         if (outcome == Outcome.YES) {
             m.outcomeYes += uint128(amount);
             sharesYes[marketId][msg.sender] += amount;
@@ -67,6 +69,8 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
             m.outcomeNo += uint128(amount);
             sharesNo[marketId][msg.sender] += amount;
         }
+
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         emit BetPlaced(marketId, msg.sender, outcome, amount);
     }
@@ -111,9 +115,9 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
         reward += userShares;
 
         if (fee > 0) {
-            token.transfer(feeCollector, fee);
+            token.safeTransfer(feeCollector, fee);
         }
-        token.transfer(msg.sender, reward);
+        token.safeTransfer(msg.sender, reward);
 
         emit RewardClaimed(marketId, msg.sender, reward);
     }

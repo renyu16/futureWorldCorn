@@ -99,7 +99,8 @@ contract PredictionMarketTest is Test {
         pm.claimReward(id);
         uint256 balanceAfter = token.balanceOf(alice);
 
-        assertGt(balanceAfter, balanceBefore);
+        // reward = 1000 (stake) + (1000 * (500 - 10)) / 1000 = 1000 + 490 = 1490
+        assertEq(balanceAfter - balanceBefore, 1490);
         assertTrue(pm.claimed(id, alice));
     }
 

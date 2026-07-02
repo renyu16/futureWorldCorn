@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 import "forge-std/Test.sol";
 import "../src/CornToken.sol";
 import "../src/PredictionMarket.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract PredictionMarketTest is Test {
     CornToken token;
@@ -17,7 +19,15 @@ contract PredictionMarketTest is Test {
     function setUp() public {
         vm.warp(1);
         token = new CornToken();
-        pm = new PredictionMarket(address(token), feeCollector);
+        PredictionMarket implementation = new PredictionMarket();
+        bytes memory initData = abi.encodeWithSelector(
+            PredictionMarket.initialize.selector,
+            address(token),
+            feeCollector,
+            address(this)
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        pm = PredictionMarket(address(proxy));
 
         token.transfer(alice, 10_000 ether);
         token.transfer(bob, 10_000 ether);
@@ -168,7 +178,7 @@ contract PredictionMarketTest is Test {
 
     function test_OnlyOwnerCreate() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
         pm.createMarket(QUESTION, DEADLINE, 200);
     }
 }

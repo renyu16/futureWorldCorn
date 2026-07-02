@@ -10,5 +10,6 @@ ffi = true
 
 remappings = [
     "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@chainlink/=lib/chainlink-brownie-contracts/contracts/",
 ]

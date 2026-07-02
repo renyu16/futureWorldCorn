@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract PredictionMarket is Ownable2Step, ReentrancyGuard {
+contract PredictionMarket is
+    Ownable2StepUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable
+{
     using SafeERC20 for IERC20;
 
     IERC20 public token;
-    uint16 public defaultFeeBps = 200;
+    uint16 public defaultFeeBps;
     address public feeCollector;
     uint256 public marketCount;
     mapping(address => bool) public resolvers;
@@ -37,10 +43,25 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
     event MarketResolved(uint256 indexed id, bool result);
     event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount);
 
-    constructor(address _token, address _feeCollector) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _token, address _feeCollector, address _initialOwner)
+        external
+        initializer
+    {
+        __Ownable_init(_initialOwner);
+        __Ownable2Step_init();
+        __ReentrancyGuard_init();
+
         token = IERC20(_token);
         feeCollector = _feeCollector;
+        defaultFeeBps = 200;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external onlyOwner {
         require(deadline > block.timestamp, "deadline in past");
@@ -135,4 +156,6 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
     function setFeeCollector(address _feeCollector) external onlyOwner {
         feeCollector = _feeCollector;
     }
+
+    uint256[50] private __gap;
 }

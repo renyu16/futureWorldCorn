@@ -12,6 +12,7 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
     uint16 public defaultFeeBps = 200;
     address public feeCollector;
     uint256 public marketCount;
+    mapping(address => bool) public resolvers;
 
     enum Outcome { YES, NO }
     enum MarketStatus { Open, Resolved }
@@ -75,7 +76,12 @@ contract PredictionMarket is Ownable2Step, ReentrancyGuard {
         emit BetPlaced(marketId, msg.sender, outcome, amount);
     }
 
-    function resolveMarket(uint256 marketId, bool result) external onlyOwner {
+    function setResolver(address resolver, bool active) external onlyOwner {
+        resolvers[resolver] = active;
+    }
+
+    function resolveMarket(uint256 marketId, bool result) external {
+        require(msg.sender == owner() || resolvers[msg.sender], "unauthorized");
         Market storage m = markets[marketId];
         require(m.status == MarketStatus.Open, "already resolved");
         require(block.timestamp >= m.deadline, "deadline not reached");

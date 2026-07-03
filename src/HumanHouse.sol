@@ -77,6 +77,8 @@ contract HumanHouse is Ownable, Pausable {
         require(d.state == DisputeState.Active, "not active");
         require(block.timestamp < d.deadline, "voting ended");
         require(_verifyWorldId(), "World ID verification failed");
+        require(!hasVoted[disputeId][uint256(uint160(msg.sender))], "already voted");
+        hasVoted[disputeId][uint256(uint160(msg.sender))] = true;
 
         if (support) {
             d.votesFor++;

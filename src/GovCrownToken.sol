@@ -9,7 +9,9 @@ contract GovCrownToken is ERC20Permit, ERC20Votes, ERC20Wrapper {
         ERC20("Governance Crown Token", "govCORN")
         ERC20Permit("Governance Crown Token")
         ERC20Wrapper(_underlying)
-    {}
+    {
+        require(address(_underlying) != address(0), "invalid underlying");
+    }
 
     function _update(address from, address to, uint256 amount)
         internal override(ERC20, ERC20Votes)

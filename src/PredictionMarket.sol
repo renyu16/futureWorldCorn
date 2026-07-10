@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -108,6 +108,16 @@ contract PredictionMarket is
         require(block.timestamp >= m.deadline, "deadline not reached");
 
         m.status = MarketStatus.Resolved;
+        m.result = result;
+
+        emit MarketResolved(marketId, result);
+    }
+
+    function disputeResolve(uint256 marketId, bool result) external {
+        require(resolvers[msg.sender], "unauthorized: not a resolver");
+        Market storage m = markets[marketId];
+        require(m.status == MarketStatus.Resolved, "market not yet resolved");
+
         m.result = result;
 
         emit MarketResolved(marketId, result);

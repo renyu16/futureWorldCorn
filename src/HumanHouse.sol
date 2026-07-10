@@ -5,6 +5,20 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
+interface IMarket {
+    function markets(uint256 id) external view returns (
+        string memory question,
+        uint128 outcomeYes,
+        uint128 outcomeNo,
+        uint40 deadline,
+        uint8 status,
+        bool result,
+        uint16 feeBps
+    );
+    function resolveMarket(uint256 marketId, bool result) external;
+    function disputeResolve(uint256 marketId, bool result) external;
+}
+
 contract HumanHouse is Ownable, Pausable {
     using SafeERC20 for IERC20;
 
@@ -34,7 +48,7 @@ contract HumanHouse is Ownable, Pausable {
 
     event DisputeCreated(uint256 indexed disputeId, uint256 indexed marketId, DisputeType disputeType, string reason);
     event VoteCast(uint256 indexed disputeId, bool support);
-    event DisputeExecuted(uint256 indexed disputeId, DisputeState outcome);
+    event DisputeExecuted(uint256 indexed disputeId, DisputeState outcome, uint256 votesFor, uint256 votesAgainst);
 
     constructor(address _cornToken, address _predictionMarket, uint256 _disputeDeposit)
         Ownable(msg.sender)
@@ -97,11 +111,16 @@ contract HumanHouse is Ownable, Pausable {
         if (d.votesFor > d.votesAgainst) {
             d.state = DisputeState.Approved;
             cornToken.safeTransfer(d.initiator, d.deposit);
+
+            if (d.disputeType == DisputeType.OracleResult) {
+                (,,,,, bool currentResult,) = IMarket(predictionMarket).markets(d.marketId);
+                IMarket(predictionMarket).disputeResolve(d.marketId, !currentResult);
+            }
         } else {
             d.state = DisputeState.Rejected;
         }
 
-        emit DisputeExecuted(disputeId, d.state);
+        emit DisputeExecuted(disputeId, d.state, d.votesFor, d.votesAgainst);
     }
 
     function setDisputeDeposit(uint256 _deposit) external onlyOwner {

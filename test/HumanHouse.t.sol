@@ -56,6 +56,7 @@ contract HumanHouseTest is Test {
     function test_ExecuteDispute_Approved() public {
         vm.warp(block.timestamp + 8 days);
         market.resolveMarket(1, true);
+        market.setResolver(address(humanHouse), true);
 
         // Raise dispute
         vm.startPrank(alice);
@@ -76,6 +77,9 @@ contract HumanHouseTest is Test {
         (,, HumanHouse.DisputeState state,,,,,,) = humanHouse.disputes(1);
         assertEq(uint8(state), uint8(HumanHouse.DisputeState.Approved));
         assertEq(aliceBalanceAfter - aliceBalanceBefore, 1000e18);
+
+        (,,,,, bool marketResult,) = market.markets(1);
+        assertTrue(!marketResult); // result flipped from true to false
     }
 
     function test_ExecuteDispute_Rejected() public {
@@ -123,5 +127,115 @@ contract HumanHouseTest is Test {
         vm.expectRevert();
         humanHouse.setVotingPeriod(3 days);
         vm.stopPrank();
+    }
+
+    // ===== 追加（任务3）：vote 防重复与投票期 =====
+
+    function test_DoubleVoteReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        humanHouse.vote(1, true);
+        vm.expectRevert("already voted");
+        humanHouse.vote(1, true);
+    }
+
+    function test_VoteAfterDeadlineReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        // votingPeriod = 5 days，dispute deadline ≈ 13 days；warp 6 days → 14 days 已过窗
+        vm.warp(block.timestamp + 6 days);
+        vm.expectRevert("voting ended");
+        humanHouse.vote(1, true);
+    }
+
+    // 注：whenNotPaused 修饰 raiseDispute/vote，但 HumanHouse 未暴露 external pause()，
+    // 故无法在本地（不改源码）触发 pause。paused 路径列为 GAP-2（见执行记录）。
+
+    // ===== 追加（任务4）：executeDispute 时间窗、二次执行、withdrawFees =====
+
+    function test_ExecuteBeforeDeadlineReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        // 未过 votingPeriod，不应执行
+        vm.expectRevert("voting not ended");
+        humanHouse.executeDispute(1);
+    }
+
+    function test_ExecuteTwiceReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        humanHouse.vote(1, false); // votesAgainst > votesFor → Rejected
+        vm.warp(block.timestamp + 6 days);
+        humanHouse.executeDispute(1);
+
+        vm.expectRevert("not active");
+        humanHouse.executeDispute(1);
+    }
+
+    function test_WithdrawFeesAfterReject() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        humanHouse.vote(1, false);
+        vm.warp(block.timestamp + 6 days);
+        humanHouse.executeDispute(1); // Rejected，押金被没收留合约
+
+        // owner 为本测试合约（setUp 中 new HumanHouse 的 msg.sender = this）
+        uint256 ownerBalBefore = corn.balanceOf(address(this));
+        humanHouse.withdrawFees();
+        uint256 ownerBalAfter = corn.balanceOf(address(this));
+        assertEq(ownerBalAfter - ownerBalBefore, 1000e18);
+    }
+
+    // ===== GAP-1 验证：争议批准后实际修改市场结果 =====
+    function test_DisputeApprovedFlipsMarketResult() public {
+        // Add HumanHouse as resolver
+        market.setResolver(address(humanHouse), true);
+
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+        (,,,,, bool originalResult,) = market.markets(1);
+        assertTrue(originalResult);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
+        vm.stopPrank();
+
+        humanHouse.vote(1, true);
+        vm.warp(block.timestamp + 6 days);
+        humanHouse.executeDispute(1);
+
+        (,,,,, bool newResult,) = market.markets(1);
+        assertTrue(!newResult); // result should be flipped (now false)
     }
 }

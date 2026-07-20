@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol
 import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TokenHouse is
     Governor,
@@ -17,7 +18,7 @@ contract TokenHouse is
 {
     constructor(IVotes _govCORN, TimelockController _timelock)
         Governor("TokenHouse")
-        GovernorSettings(1, 50400, 0)
+        GovernorSettings(1, 129600, 0)
         GovernorVotes(_govCORN)
         GovernorVotesQuorumFraction(4)
         GovernorTimelockControl(_timelock)
@@ -32,7 +33,7 @@ contract TokenHouse is
     }
 
     function proposalThreshold() public view override(Governor, GovernorSettings) returns (uint256) {
-        return GovernorSettings.proposalThreshold();
+        return IERC20(address(token())).totalSupply() / 100;
     }
 
     function quorum(uint256 blockNumber)

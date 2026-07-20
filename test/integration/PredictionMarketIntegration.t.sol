@@ -55,7 +55,7 @@ contract PredictionMarketIntegrationTest is Test {
         assertEq(pm.sharesNo(marketId, bob), 500);
 
         // Verify pool totals
-        (, uint128 outcomeYes, uint128 outcomeNo,,,) = pm.markets(marketId);
+        (, uint128 outcomeYes, uint128 outcomeNo,,,,) = pm.markets(marketId);
         assertEq(outcomeYes, 1000);
         assertEq(outcomeNo, 500);
 

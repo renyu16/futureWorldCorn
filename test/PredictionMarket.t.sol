@@ -4,7 +4,7 @@ import "forge-std/Test.sol";
 import "../src/CornToken.sol";
 import "../src/PredictionMarket.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract PredictionMarketTest is Test {
     CornToken token;
@@ -106,6 +106,7 @@ contract PredictionMarketTest is Test {
         pm.resolveMarket(id, true);
 
         uint256 balanceBefore = token.balanceOf(alice);
+        vm.prank(alice);
         pm.claimReward(id);
         uint256 balanceAfter = token.balanceOf(alice);
 
@@ -138,7 +139,7 @@ contract PredictionMarketTest is Test {
         assertEq(pm.sharesYes(id, bob), 0);
         assertEq(pm.sharesNo(id, alice), 0);
 
-        (, uint128 outcomeYes, uint128 outcomeNo,,,) = pm.markets(1);
+        (, uint128 outcomeYes, uint128 outcomeNo,,,,) = pm.markets(1);
         assertEq(outcomeYes, 1000);
         assertEq(outcomeNo, 500);
     }

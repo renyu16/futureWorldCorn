@@ -2,6 +2,9 @@
 build:
 	forge build
 
+# 本地测试：纯 anvil 执行，零外部 RPC 依赖（一条命令全量运行全部合约测试）
+# 覆盖：PredictionMarket / CornToken / GovCrownToken / OracleAdapter / HumanHouse
+#       + 集成：GovernanceIntegration（治理委托骨架）/ DeployDryRun（Timelock 所有权转移）
 test:
 	forge test -vvv
 

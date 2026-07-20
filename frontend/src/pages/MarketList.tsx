@@ -37,7 +37,7 @@ export function MarketList({ onSelect }: Props) {
 
   if (total === 0) return <div>No markets yet.</div>
 
-  const ids = Array.from({ length: total }, (_, i) => i)
+  const ids = Array.from({ length: total }, (_, i) => i + 1)
 
   return (
     <div>

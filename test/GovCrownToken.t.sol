@@ -52,4 +52,26 @@ contract GovCrownTokenTest is Test {
         assertEq(govCorn.name(), "Governance Crown Token");
         assertEq(govCorn.symbol(), "govCORN");
     }
+
+    // ===== 追加（任务6）：委托前投票权为零 + 包装完整性 =====
+
+    function test_GetVotesBeforeDelegateZero() public {
+        vm.startPrank(alice);
+        corn.approve(address(govCorn), 500e18);
+        govCorn.depositFor(alice, 500e18);
+        vm.stopPrank();
+        // 未 delegate 时，ERC20Votes 不自动授予投票权
+        assertEq(govCorn.getVotes(alice), 0);
+        assertEq(govCorn.getVotes(bob), 0);
+    }
+
+    function test_WrapIntegrity() public {
+        vm.startPrank(alice);
+        corn.approve(address(govCorn), 500e18);
+        govCorn.depositFor(alice, 500e18);
+        vm.stopPrank();
+        // govCORN 总供应应等于合约锁定的 CORN（1:1 包装）
+        assertEq(govCorn.totalSupply(), 500e18);
+        assertEq(corn.balanceOf(address(govCorn)), 500e18);
+    }
 }

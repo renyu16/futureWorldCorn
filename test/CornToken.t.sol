@@ -8,7 +8,7 @@ contract CornTokenTest is Test {
     address alice = address(0x1);
     address bob = address(0x2);
 
-    uint256 internal constant INITIAL_SUPPLY = 1_000_000_000 * 10**18;
+    uint256 internal constant INITIAL_SUPPLY = 1_000_000_000 * 10**18 - 1000;
 
     function setUp() public {
         token = new CornToken();
@@ -38,12 +38,12 @@ contract CornTokenTest is Test {
 
     function test_MintRevertsExceedingMaxSupply() public {
         vm.expectRevert("exceeds max supply");
-        token.mint(alice, 1);
+        token.mint(alice, 1001);
     }
 
     function test_LockMint() public {
-        vm.expectEmit(true, true, true, true);
-        emit MintLocked();
+        vm.expectEmit(true, true, true, true, address(token));
+        emit CornToken.MintLocked();
         token.lockMint();
         assertTrue(token.mintLocked());
     }
@@ -63,6 +63,7 @@ contract CornTokenTest is Test {
     }
 
     function test_BurnRevertsForInsufficientBalance() public {
+        vm.prank(alice);
         vm.expectRevert();
         token.burn(1);
     }
@@ -84,7 +85,7 @@ contract CornTokenTest is Test {
                             user,
                             alice,
                             100,
-                            token.nonces(user) + 1,
+                            token.nonces(user),
                             block.timestamp
                         )
                     )

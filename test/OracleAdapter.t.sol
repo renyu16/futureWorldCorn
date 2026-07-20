@@ -4,6 +4,7 @@ import "forge-std/Test.sol";
 import "../src/CornToken.sol";
 import "../src/PredictionMarket.sol";
 import "../src/OracleAdapter.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract MockAggregator {
     int256 private _price;
@@ -36,7 +37,15 @@ contract OracleAdapterTest is Test {
     function setUp() public {
         vm.warp(1);
         token = new CornToken();
-        pm = new PredictionMarket(address(token), feeCollector);
+        PredictionMarket implementation = new PredictionMarket();
+        bytes memory initData = abi.encodeWithSelector(
+            PredictionMarket.initialize.selector,
+            address(token),
+            feeCollector,
+            address(this)
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        pm = PredictionMarket(address(proxy));
         aggregator = new MockAggregator();
 
         pm.createMarket(QUESTION, DEADLINE, 200);

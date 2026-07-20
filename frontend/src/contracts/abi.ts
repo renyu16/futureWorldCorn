@@ -59,3 +59,31 @@ export const predictionMarketABI = [
   'event MarketResolved(uint256 indexed id, bool result)',
   'event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount)',
 ] as const
+
+export const GOV_CORN_TOKEN_ADDRESS = '0x...'
+
+export const govCrownTokenABI = [
+  'function depositFor(address account, uint256 amount)',
+  'function withdrawTo(address account, uint256 amount)',
+  'function delegate(address delegatee)',
+  'function getVotes(address account) view returns (uint256)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function totalSupply() view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
+] as const
+
+export const TOKEN_HOUSE_ADDRESS = '0x...'
+
+export const tokenHouseABI = [
+  'function state(uint256 proposalId) view returns (uint8)',
+  'function proposalProposer(uint256 proposalId) view returns (address)',
+  'function proposalDeadline(uint256 proposalId) view returns (uint256)',
+  'function proposalSnapshot(uint256 proposalId) view returns (uint256)',
+  'function proposalVotes(uint256 proposalId) view returns (uint256 against, uint256 forVotes, uint256 abstain)',
+  'function castVote(uint256 proposalId, uint8 support) returns (uint256)',
+  'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) view returns (uint256)',
+  'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
+] as const

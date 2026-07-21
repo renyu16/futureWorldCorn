@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "../src/TokenHouse.sol";
 import "../src/HumanHouse.sol";
+import "../src/interfaces/IWorldID.sol";
 
 /**
  * Phase 3 部署脚本：部署 TokenHouse 和 HumanHouse，配置 Timelock 角色。
@@ -22,13 +23,23 @@ contract DeployPhase3 is Script {
         address cornToken = vm.envAddress("CORN_TOKEN_ADDRESS");
         address marketProxy = vm.envAddress("MARKET_PROXY_ADDRESS");
         uint256 disputeDeposit = vm.envOr("DISPUTE_DEPOSIT", uint256(1000e18));
+        address worldIdRouter = vm.envAddress("WORLD_ID_ROUTER_ADDRESS");
+        string memory appId = vm.envString("WORLD_ID_APP_ID");
+        string memory actionId = vm.envOr("WORLD_ID_ACTION_ID", string("human_house_vote"));
 
         vm.startBroadcast(deployerKey);
 
         TimelockController timelock = TimelockController(payable(timelockAddr));
 
         TokenHouse tokenHouse = new TokenHouse(IVotes(govCorn), timelock);
-        HumanHouse humanHouse = new HumanHouse(cornToken, marketProxy, disputeDeposit);
+        HumanHouse humanHouse = new HumanHouse(
+            cornToken,
+            marketProxy,
+            disputeDeposit,
+            IWorldID(worldIdRouter),
+            appId,
+            actionId
+        );
 
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(tokenHouse));
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(humanHouse));

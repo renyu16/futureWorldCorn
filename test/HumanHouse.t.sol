@@ -4,15 +4,25 @@ import "forge-std/Test.sol";
 import "../src/CornToken.sol";
 import "../src/PredictionMarket.sol";
 import "../src/HumanHouse.sol";
+import "../src/interfaces/IWorldID.sol";
+import "./mocks/MockWorldIdRouter.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract HumanHouseTest is Test {
     CornToken corn;
     PredictionMarket market;
     HumanHouse humanHouse;
+    MockWorldIdRouter mockWorldId;
     address feeCollector = address(0x99);
     address alice = address(0x1);
     address bob = address(0x2);
+
+    uint256[8] proof = [uint256(1), 2, 3, 4, 5, 6, 7, 8];
+    uint256 nextNullifier = 1;
+
+    function _makeNullifier() internal returns (uint256) {
+        return nextNullifier++;
+    }
 
     function setUp() public {
         corn = new CornToken();
@@ -37,7 +47,15 @@ contract HumanHouseTest is Test {
         // Fund bob
         corn.transfer(bob, 10000e18);
 
-        humanHouse = new HumanHouse(address(corn), address(market), 1000e18);
+        mockWorldId = new MockWorldIdRouter();
+        humanHouse = new HumanHouse(
+            address(corn),
+            address(market),
+            1000e18,
+            IWorldID(address(mockWorldId)),
+            "app_test",
+            "human_house_vote"
+        );
     }
 
     function test_RaiseDispute() public {
@@ -65,7 +83,7 @@ contract HumanHouseTest is Test {
         vm.stopPrank();
 
         // Vote in favor
-        humanHouse.vote(1, true);
+        humanHouse.vote(1, true, 0, _makeNullifier(), proof);
 
         // Warp past deadline
         vm.warp(block.timestamp + 6 days);
@@ -93,7 +111,7 @@ contract HumanHouseTest is Test {
         vm.stopPrank();
 
         // Vote against
-        humanHouse.vote(1, false);
+        humanHouse.vote(1, false, 0, _makeNullifier(), proof);
 
         // Warp past deadline
         vm.warp(block.timestamp + 6 days);
@@ -140,9 +158,10 @@ contract HumanHouseTest is Test {
         humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
         vm.stopPrank();
 
-        humanHouse.vote(1, true);
+        uint256 n = _makeNullifier();
+        humanHouse.vote(1, true, 0, n, proof);
         vm.expectRevert("already voted");
-        humanHouse.vote(1, true);
+        humanHouse.vote(1, true, 0, n, proof);
     }
 
     function test_VoteAfterDeadlineReverts() public {
@@ -157,7 +176,7 @@ contract HumanHouseTest is Test {
         // votingPeriod = 5 days，dispute deadline ≈ 13 days；warp 6 days → 14 days 已过窗
         vm.warp(block.timestamp + 6 days);
         vm.expectRevert("voting ended");
-        humanHouse.vote(1, true);
+        humanHouse.vote(1, true, 0, _makeNullifier(), proof);
     }
 
     // 注：whenNotPaused 修饰 raiseDispute/vote，但 HumanHouse 未暴露 external pause()，
@@ -188,7 +207,7 @@ contract HumanHouseTest is Test {
         humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
         vm.stopPrank();
 
-        humanHouse.vote(1, false); // votesAgainst > votesFor → Rejected
+        humanHouse.vote(1, false, 0, _makeNullifier(), proof); // votesAgainst > votesFor -> Rejected
         vm.warp(block.timestamp + 6 days);
         humanHouse.executeDispute(1);
 
@@ -205,7 +224,7 @@ contract HumanHouseTest is Test {
         humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
         vm.stopPrank();
 
-        humanHouse.vote(1, false);
+        humanHouse.vote(1, false, 0, _makeNullifier(), proof);
         vm.warp(block.timestamp + 6 days);
         humanHouse.executeDispute(1); // Rejected，押金被没收留合约
 
@@ -231,11 +250,48 @@ contract HumanHouseTest is Test {
         humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "Wrong result");
         vm.stopPrank();
 
-        humanHouse.vote(1, true);
+        humanHouse.vote(1, true, 0, _makeNullifier(), proof);
         vm.warp(block.timestamp + 6 days);
         humanHouse.executeDispute(1);
 
         (,,,,, bool newResult,) = market.markets(1);
         assertTrue(!newResult); // result should be flipped (now false)
+    }
+
+    // ===== World ID 集成测试 =====
+
+    function test_DuplicateNullifierReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "bad oracle");
+        vm.stopPrank();
+
+        uint256 n = _makeNullifier();
+
+        vm.prank(alice);
+        humanHouse.vote(1, true, 0, n, proof);
+
+        vm.prank(bob);
+        vm.expectRevert("already voted");
+        humanHouse.vote(1, true, 0, n, proof);
+    }
+
+    function test_InvalidProofReverts() public {
+        vm.warp(block.timestamp + 8 days);
+        market.resolveMarket(1, true);
+
+        vm.startPrank(alice);
+        corn.approve(address(humanHouse), 1000e18);
+        humanHouse.raiseDispute(1, HumanHouse.DisputeType.OracleResult, "bad oracle");
+        vm.stopPrank();
+
+        mockWorldId.setShouldRevert(true);
+
+        vm.prank(alice);
+        vm.expectRevert("MockWorldId: invalid proof");
+        humanHouse.vote(1, true, 0, _makeNullifier(), proof);
     }
 }

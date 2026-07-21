@@ -4,6 +4,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "./interfaces/IWorldID.sol";
+import "./libraries/ByteHasher.sol";
 
 interface IMarket {
     function markets(uint256 id) external view returns (
@@ -21,6 +23,7 @@ interface IMarket {
 
 contract HumanHouse is Ownable, Pausable {
     using SafeERC20 for IERC20;
+    using ByteHasher for bytes;
 
     enum DisputeType { OracleResult, MarketContent }
     enum DisputeState { Active, Approved, Rejected }
@@ -43,21 +46,38 @@ contract HumanHouse is Ownable, Pausable {
     uint256 public votingPeriod = 5 days;
     uint256 public disputeCount;
 
+    IWorldID public immutable worldIdRouter;
+    uint256 public immutable externalNullifierHash;
+    uint256 public constant groupId = 1;
+
     mapping(uint256 => Dispute) public disputes;
-    mapping(uint256 => mapping(uint256 => bool)) public hasVoted;
+    mapping(uint256 => mapping(uint256 => bool)) public nullifierUsed;
 
     event DisputeCreated(uint256 indexed disputeId, uint256 indexed marketId, DisputeType disputeType, string reason);
     event VoteCast(uint256 indexed disputeId, bool support);
     event DisputeExecuted(uint256 indexed disputeId, DisputeState outcome, uint256 votesFor, uint256 votesAgainst);
 
-    constructor(address _cornToken, address _predictionMarket, uint256 _disputeDeposit)
+    constructor(
+        address _cornToken,
+        address _predictionMarket,
+        uint256 _disputeDeposit,
+        IWorldID _worldIdRouter,
+        string memory _appId,
+        string memory _actionId
+    )
         Ownable(msg.sender)
     {
         require(_cornToken != address(0), "invalid token");
         require(_predictionMarket != address(0), "invalid market");
+        require(address(_worldIdRouter) != address(0), "invalid worldId");
         cornToken = IERC20(_cornToken);
         predictionMarket = _predictionMarket;
         disputeDeposit = _disputeDeposit;
+        worldIdRouter = _worldIdRouter;
+        externalNullifierHash = abi.encodePacked(
+            abi.encodePacked(_appId).hashToField(),
+            _actionId
+        ).hashToField();
     }
 
     function raiseDispute(
@@ -85,14 +105,26 @@ contract HumanHouse is Ownable, Pausable {
 
     function vote(
         uint256 disputeId,
-        bool support
+        bool support,
+        uint256 root,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
     ) external whenNotPaused {
         Dispute storage d = disputes[disputeId];
         require(d.state == DisputeState.Active, "not active");
         require(block.timestamp < d.deadline, "voting ended");
-        require(_verifyWorldId(), "World ID verification failed");
-        require(!hasVoted[disputeId][uint256(uint160(msg.sender))], "already voted");
-        hasVoted[disputeId][uint256(uint160(msg.sender))] = true;
+        require(!nullifierUsed[disputeId][nullifierHash], "already voted");
+
+        worldIdRouter.verifyProof(
+            root,
+            groupId,
+            abi.encodePacked(msg.sender).hashToField(),
+            nullifierHash,
+            externalNullifierHash,
+            proof
+        );
+
+        nullifierUsed[disputeId][nullifierHash] = true;
 
         if (support) {
             d.votesFor++;
@@ -129,11 +161,6 @@ contract HumanHouse is Ownable, Pausable {
 
     function setVotingPeriod(uint256 _period) external onlyOwner {
         votingPeriod = _period;
-    }
-
-    function _verifyWorldId() internal view returns (bool) {
-        // TODO: Integrate World ID IdentityManager
-        return true;
     }
 
     /// @notice Withdraw forfeited deposits (rejected disputes)

@@ -87,3 +87,19 @@ export const tokenHouseABI = [
   'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) view returns (uint256)',
   'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
 ] as const
+
+export const HUMAN_HOUSE_ADDRESS = '0x...'
+
+export const humanHouseABI = [
+  'function raiseDispute(uint256 marketId, uint8 disputeType, string reason)',
+  'function vote(uint256 disputeId, bool support, uint256 root, uint256 nullifierHash, uint256[8] proof)',
+  'function executeDispute(uint256 disputeId)',
+  'function disputeDeposit() view returns (uint256)',
+  'function votingPeriod() view returns (uint256)',
+  'function disputeCount() view returns (uint256)',
+  'function disputes(uint256 id) view returns (uint256 marketId, uint8 disputeType, uint8 state, address initiator, uint256 deposit, uint256 deadline, string reason, uint256 votesFor, uint256 votesAgainst)',
+  'function nullifierUsed(uint256 disputeId, uint256 nullifierHash) view returns (bool)',
+  'event DisputeCreated(uint256 indexed disputeId, uint256 indexed marketId, uint8 disputeType, string reason)',
+  'event VoteCast(uint256 indexed disputeId, bool support)',
+  'event DisputeExecuted(uint256 indexed disputeId, uint8 outcome, uint256 votesFor, uint256 votesAgainst)',
+] as const

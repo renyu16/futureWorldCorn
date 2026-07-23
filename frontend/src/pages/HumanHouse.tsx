@@ -14,6 +14,10 @@ const DISPUTE_TYPE: Record<number, string> = { 0: 'Oracle Result', 1: 'Market Co
 const DISPUTE_STATE: Record<number, string> = { 0: 'Active', 1: 'Approved', 2: 'Rejected' }
 const STATE_COLOR: Record<number, string> = { 0: '#5bc0de', 1: '#5cb85c', 2: '#d9534f' }
 
+const MOCK_ROOT = 0n
+const MOCK_NULLIFIER_HASH = 0n
+const MOCK_PROOF = [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint]
+
 interface DisputeInfo {
   id: bigint
   marketId: bigint
@@ -32,10 +36,6 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   const [marketId, disputeType, state, initiator, deposit, deadline, reason, votesFor, votesAgainst] = dispute as any
   const isActive = Number(state) === 0
   const isExpired = Date.now() / 1000 > Number(deadline)
-
-  const mockRoot = 0n
-  const mockNullifierHash = 0n
-  const mockProof = [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint]
 
   return (
     <div>
@@ -60,7 +60,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
               address: HUMAN_HOUSE_ADDRESS,
               abi: humanHouseABI,
               functionName: 'vote',
-              args: [id, true, mockRoot, mockNullifierHash, mockProof],
+              args: [id, true, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
             })}
             style={{ marginRight: 8, background: '#5cb85c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
           >
@@ -71,7 +71,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
               address: HUMAN_HOUSE_ADDRESS,
               abi: humanHouseABI,
               functionName: 'vote',
-              args: [id, false, mockRoot, mockNullifierHash, mockProof],
+              args: [id, false, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
             })}
             style={{ background: '#d9534f', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
           >
@@ -116,6 +116,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
   })
 
   const needsApprove = disputeDeposit && allowance !== undefined && (disputeDeposit as bigint) > (allowance as bigint)
+  const validMarketId = /^\d+$/.test(marketId)
 
   return (
     <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
@@ -151,7 +152,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
           </button>
         )}
         <button
-          disabled={!marketId || !reason || !!needsApprove}
+          disabled={!validMarketId || !reason || !!needsApprove}
           onClick={() => writeContract({
             address: HUMAN_HOUSE_ADDRESS,
             abi: humanHouseABI,
@@ -193,11 +194,13 @@ export function HumanHouse() {
   const publicClient = usePublicClient()
   const [disputes, setDisputes] = useState<DisputeInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<bigint | null>(null)
 
   useEffect(() => {
     if (!publicClient) return
     setLoading(true)
+    setError(null)
     fetchDisputeCreatedLogs(publicClient).then((logs: any[]) => {
       setDisputes(logs.map(l => ({
         id: l.args.disputeId as bigint,
@@ -206,7 +209,11 @@ export function HumanHouse() {
         reason: l.args.reason as string,
       })).reverse())
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch((e) => {
+      console.error('Failed to fetch disputes:', e)
+      setError('Failed to load disputes')
+      setLoading(false)
+    })
   }, [publicClient])
 
   if (selectedId !== null) {
@@ -217,7 +224,7 @@ export function HumanHouse() {
     <div>
       <h2>HumanHouse Disputes</h2>
       <RaiseDispute onCreated={() => setLoading(true)} />
-      {!address ? <p>Connect your wallet to view disputes.</p> : loading ? <p>Loading disputes...</p> : disputes.length === 0 ? <p>No disputes yet.</p> : (
+      {!address ? <p>Connect your wallet to view disputes.</p> : loading ? <p>Loading disputes...</p> : error ? <p style={{ color: '#d9534f' }}>{error}</p> : disputes.length === 0 ? <p>No disputes yet.</p> : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>

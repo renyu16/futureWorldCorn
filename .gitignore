@@ -1,0 +1,5 @@
+out/
+cache/
+
+# proflow 状态目录（自动生成）
+.opencode/status/

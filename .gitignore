@@ -3,3 +3,6 @@ cache/
 
 # proflow 状态目录（自动生成）
 .opencode/status/
+
+# Foundry 安装包
+foundry_v*_win32_amd64.zip

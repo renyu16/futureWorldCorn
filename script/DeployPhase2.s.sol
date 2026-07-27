@@ -11,8 +11,8 @@ contract DeployPhase2 is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
-        address cornToken = vm.envAddress("CORN_TOKEN_ADDRESS");
-        address marketProxy = vm.envAddress("MARKET_PROXY_ADDRESS");
+        address cornToken = vm.envAddress("CORN_TOKEN");
+        address marketProxy = vm.envAddress("MARKET_PROXY");
         address safeAddress = vm.envAddress("SAFE_ADDRESS");
         uint256 minDelay = vm.envOr("TIMELOCK_DELAY", uint256(2 days));
 
@@ -26,6 +26,7 @@ contract DeployPhase2 is Script {
             minDelay, proposers, new address[](0), deployer
         );
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
+        timelock.grantRole(timelock.DEFAULT_ADMIN_ROLE(), address(timelock));
         timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
 
         PredictionMarket market = PredictionMarket(marketProxy);

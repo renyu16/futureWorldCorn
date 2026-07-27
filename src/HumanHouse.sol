@@ -5,21 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IWorldID.sol";
+import "./interfaces/IPredictionMarket.sol";
 import "./libraries/ByteHasher.sol";
-
-interface IMarket {
-    function markets(uint256 id) external view returns (
-        string memory question,
-        uint128 outcomeYes,
-        uint128 outcomeNo,
-        uint40 deadline,
-        uint8 status,
-        bool result,
-        uint16 feeBps
-    );
-    function resolveMarket(uint256 marketId, bool result) external;
-    function disputeResolve(uint256 marketId, bool result) external;
-}
 
 contract HumanHouse is Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -145,8 +132,8 @@ contract HumanHouse is Ownable, Pausable {
             cornToken.safeTransfer(d.initiator, d.deposit);
 
             if (d.disputeType == DisputeType.OracleResult) {
-                (,,,,, bool currentResult,) = IMarket(predictionMarket).markets(d.marketId);
-                IMarket(predictionMarket).disputeResolve(d.marketId, !currentResult);
+                (,,,,, bool currentResult,) = IPredictionMarket(predictionMarket).markets(d.marketId);
+                IPredictionMarket(predictionMarket).disputeResolve(d.marketId, !currentResult);
             }
         } else {
             d.state = DisputeState.Rejected;

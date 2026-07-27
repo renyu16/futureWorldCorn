@@ -55,3 +55,15 @@ export function useProposalSnapshot(proposalId: bigint | undefined) {
 export function useCastVote() {
   return useWriteContract()
 }
+
+export function usePropose() {
+  return useWriteContract()
+}
+
+export function useProposalThreshold() {
+  return useReadContract({
+    address: TOKEN_HOUSE_ADDRESS,
+    abi: tokenHouseABI,
+    functionName: 'proposalThreshold',
+  })
+}

@@ -84,6 +84,13 @@ export const tokenHouseABI = [
   'function proposalSnapshot(uint256 proposalId) view returns (uint256)',
   'function proposalVotes(uint256 proposalId) view returns (uint256 against, uint256 forVotes, uint256 abstain)',
   'function castVote(uint256 proposalId, uint8 support) returns (uint256)',
+  'function castVoteWithReason(uint256 proposalId, uint8 support, string reason) returns (uint256)',
+  'function propose(address[] targets, uint256[] values, bytes[] calldatas, string description) returns (uint256)',
+  'function proposalThreshold() view returns (uint256)',
+  'function votingDelay() view returns (uint256)',
+  'function votingPeriod() view returns (uint256)',
+  'function quorum(uint256 blockNumber) view returns (uint256)',
+  'function getVotes(address account, uint256 blockNumber) view returns (uint256)',
   'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) view returns (uint256)',
   'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
 ] as const

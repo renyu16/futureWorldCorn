@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useAccount, usePublicClient } from 'wagmi'
-import { formatEther } from 'viem'
+import { useAccount, usePublicClient, useReadContract } from 'wagmi'
+import { formatEther, encodeFunctionData } from 'viem'
 import {
   TOKEN_HOUSE_ADDRESS, tokenHouseABI,
   GOV_CORN_TOKEN_ADDRESS, govCrownTokenABI,
@@ -8,8 +8,8 @@ import {
 import {
   useProposalState, useProposalVotes, useProposalProposer,
   useProposalDeadline, useProposalSnapshot, useCastVote,
+  usePropose, useProposalThreshold,
 } from '../hooks/useGovernance'
-import { useReadContract } from 'wagmi'
 
 const STATE_LABEL: Record<string, string> = {
   Pending: 'Pending', Active: 'Active', Canceled: 'Canceled', Defeated: 'Defeated',
@@ -91,12 +91,103 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   )
 }
 
+function CreateProposal({ onCreated }: { onCreated: () => void }) {
+  const { address } = useAccount()
+  const [target, setTarget] = useState('')
+  const [value, setValue] = useState('0')
+  const [funcSig, setFuncSig] = useState('')
+  const [argsJson, setArgsJson] = useState('[]')
+  const [description, setDescription] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const { writeContract } = usePropose()
+
+  const { data: threshold } = useProposalThreshold()
+  const { data: userVotes } = useReadContract({
+    address: GOV_CORN_TOKEN_ADDRESS,
+    abi: govCrownTokenABI,
+    functionName: 'getVotes',
+    args: address ? [address] : undefined,
+  })
+
+  const canPropose = threshold !== undefined && userVotes !== undefined && (userVotes as bigint) >= (threshold as bigint)
+  const validAddress = /^0x[a-fA-F0-9]{40}$/.test(target)
+
+  const handleSubmit = () => {
+    setError(null)
+    try {
+      const abi = funcSig ? [`function ${funcSig}`] as const : ['function ()'] as const
+      const fnName = funcSig ? funcSig.split('(')[0] : ''
+      const args = funcSig ? JSON.parse(argsJson) : []
+      const calldata = funcSig
+        ? encodeFunctionData({ abi, functionName: fnName, args })
+        : '0x'
+
+      writeContract({
+        address: TOKEN_HOUSE_ADDRESS,
+        abi: tokenHouseABI,
+        functionName: 'propose',
+        args: [
+          [target as `0x${string}`],
+          [BigInt(value || '0')],
+          [calldata as `0x${string}`],
+          description,
+        ],
+      }, {
+        onSuccess: () => { setTarget(''); setValue('0'); setFuncSig(''); setArgsJson('[]'); setDescription(''); onCreated() },
+      })
+    } catch (e: any) {
+      setError(e.message || 'Failed to build calldata')
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
+      <h3>Create Proposal</h3>
+      <p>Voting Power: <strong>{userVotes ? formatEther(userVotes as bigint) : '0'}</strong> govCORN</p>
+      <p>Required: <strong>{threshold ? formatEther(threshold as bigint) : '-'}</strong> govCORN (1% of supply)</p>
+      {!canPropose && threshold !== undefined && (
+        <p style={{ color: '#d9534f', fontSize: 12 }}>Insufficient voting power to propose. Delegate or acquire more govCORN.</p>
+      )}
+      <div style={{ marginBottom: 8 }}>
+        <label>Target address: </label><br />
+        <input value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." style={{ width: 400 }} />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <label>ETH value (wei): </label><br />
+        <input value={value} onChange={e => setValue(e.target.value)} placeholder="0" style={{ width: 200 }} />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <label>Function signature (optional, e.g. transfer(address,uint256)): </label><br />
+        <input value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" style={{ width: 400 }} />
+      </div>
+      {funcSig && (
+        <div style={{ marginBottom: 8 }}>
+          <label>Arguments (JSON array): </label><br />
+          <input value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' style={{ width: 400 }} />
+        </div>
+      )}
+      <div style={{ marginBottom: 8 }}>
+        <label>Description: </label><br />
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} style={{ width: 400 }} />
+      </div>
+      {error && <p style={{ color: '#d9534f', fontSize: 12 }}>{error}</p>}
+      <button
+        disabled={!canPropose || !validAddress || !description}
+        onClick={handleSubmit}
+      >
+        Submit Proposal
+      </button>
+    </div>
+  )
+}
+
 export function Governance() {
   const { address } = useAccount()
   const publicClient = usePublicClient()
   const [proposals, setProposals] = useState<Array<{ id: bigint; description: string }>>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<bigint | null>(null)
+  const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
     if (!publicClient) return
@@ -136,6 +227,15 @@ export function Governance() {
   return (
     <div>
       <h2>Governance</h2>
+      {address && (
+        <button
+          onClick={() => setShowForm(!showForm)}
+          style={{ marginBottom: 16 }}
+        >
+          {showForm ? 'Cancel' : 'Create Proposal'}
+        </button>
+      )}
+      {showForm && <CreateProposal onCreated={() => { setShowForm(false); setLoading(true) }} />}
       {loading ? <p>Loading proposals...</p> : proposals.length === 0 ? <p>No proposals yet.</p> : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>

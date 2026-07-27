@@ -172,6 +172,14 @@ contract HumanHouse is Ownable, Pausable {
         }
     }
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     function _totalActiveDeposits() internal view returns (uint256) {
         uint256 total;
         for (uint256 i = 1; i <= disputeCount; i++) {

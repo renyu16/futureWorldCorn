@@ -137,13 +137,13 @@ Note the three deployed addresses from the deploy output:
 | PredictionMarket   | `0xabcdefabcdefabcdefabcdefabcdefabcdefabcd` |
 | OracleAdapter      | `0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef` |
 
-Update `frontend/src/contracts/addresses.ts` with the real addresses.
+Update `frontend/src/contracts/abi.ts` with the real addresses.
 
 ## After Deployment — Frontend Integration
 
 ### 1. Update contract addresses
 
-Edit `frontend/src/contracts/addresses.ts` and replace `0x...` placeholders under `chainId: 4801` with the deployed addresses.
+Edit `frontend/src/contracts/abi.ts` and replace `0x...` placeholders under `chainId: 4801` with the deployed addresses.
 
 ### 2. Start the frontend
 
@@ -179,7 +179,7 @@ When ready for mainnet (World Chain mainnet, chain ID 480):
 
 1. Update `.env` with mainnet deployer key (ensure adequate ETH for gas)
 2. Use the mainnet RPC: `https://worldchain-mainnet.g.alchemy.com/public`
-3. Update `frontend/src/contracts/addresses.ts` under `chainId: 480`
+3. Update `frontend/src/contracts/abi.ts` under `chainId: 480`
 4. Switch your wallet to World Chain mainnet
 
 ## Useful Cast Commands

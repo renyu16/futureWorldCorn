@@ -5,4 +5,9 @@ cache/
 .opencode/status/
 
 # Foundry 安装包
-foundry_v*_win32_amd64.zip
+foundry_*_win32_amd64.zip
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
+frontend/package-lock.json

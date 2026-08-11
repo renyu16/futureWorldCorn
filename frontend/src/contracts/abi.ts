@@ -1,5 +1,5 @@
-export const CORN_TOKEN_ADDRESS = '0x...'
-export const PREDICTION_MARKET_ADDRESS = '0x...'
+export const CORN_TOKEN_ADDRESS = '0x6a07C7b64702E67f32d14f55F26dAAc94082B981'
+export const PREDICTION_MARKET_ADDRESS = '0xAecA3704114B03d2d85f6EC5C4df83b277A657bb'
 
 export interface ContractAddresses {
   cornToken: `0x${string}`
@@ -9,9 +9,9 @@ export interface ContractAddresses {
 
 export const DeployedAddresses: Record<number, ContractAddresses> = {
   4801: {
-    cornToken: '0x...',
-    predictionMarket: '0x...',
-    oracleAdapter: '0x...',
+    cornToken: '0x6a07C7b64702E67f32d14f55F26dAAc94082B981',
+    predictionMarket: '0xAecA3704114B03d2d85f6EC5C4df83b277A657bb',
+    oracleAdapter: '0x617CEC12C21b4D4Def72afAd7858E7596e83dc82',
   },
   480: {
     cornToken: '0x...',

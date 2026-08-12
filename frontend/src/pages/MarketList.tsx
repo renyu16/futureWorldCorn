@@ -1,11 +1,11 @@
-import { useMarketCount, useMarket } from '../hooks/useMarket'
+import { useMarketCount, useMarketTuple } from '../hooks/useMarket'
 
 interface Props {
   onSelect: (id: number) => void
 }
 
 function MarketCard({ id, onSelect }: { id: number; onSelect: (id: number) => void }) {
-  const { data: market, isLoading } = useMarket(id)
+  const { data: market, isLoading } = useMarketTuple(id)
 
   if (isLoading) return <div>Loading market {id}...</div>
 

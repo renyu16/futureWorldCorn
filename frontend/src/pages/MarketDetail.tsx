@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
-import { useMarket, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
+import { useMarketTuple, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
 import { useTokenBalance, useTokenAllowance, useWriteApprove } from '../hooks/useToken'
 import { CORN_TOKEN_ADDRESS, PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
 
@@ -10,7 +10,7 @@ interface Props {
 
 export function MarketDetail({ marketId }: Props) {
   const { address } = useAccount()
-  const { data: market, isLoading } = useMarket(marketId)
+  const { data: market, isLoading } = useMarketTuple(marketId)
   const { data: balance } = useTokenBalance(address)
   const { data: allowance } = useTokenAllowance(address, PREDICTION_MARKET_ADDRESS)
   const { data: owner } = useReadContract({

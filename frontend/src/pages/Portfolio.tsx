@@ -1,9 +1,9 @@
 import { useAccount } from 'wagmi'
-import { useMarketCount, useMarket } from '../hooks/useMarket'
+import { useMarketCount, useMarketTuple } from '../hooks/useMarket'
 import { useTokenBalance } from '../hooks/useToken'
 
-function MarketPosition({ marketId, user }: { marketId: number; user: `0x${string}` }) {
-  const { data: market } = useMarket(marketId)
+function MarketPosition({ marketId }: { marketId: number }) {
+  const { data: market } = useMarketTuple(marketId)
   if (!market) return null
 
   const [question, , , , status] = market
@@ -37,7 +37,7 @@ export function Portfolio() {
           {total === 0 ? (
             <p>No markets found.</p>
           ) : (
-            ids.map((id) => <MarketPosition key={id} marketId={id} user={address} />)
+            ids.map((id) => <MarketPosition key={id} marketId={id} />)
           )}
         </>
       ) : (

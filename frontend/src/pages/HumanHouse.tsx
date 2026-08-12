@@ -108,6 +108,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
   const { writeContract: writeApprove } = useWriteContract()
 
   const { data: disputeDeposit } = useDisputeDeposit()
+  const deposit = (disputeDeposit as bigint | undefined) ?? 0n
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: CORN_TOKEN_ADDRESS,
     abi: cornTokenABI,
@@ -115,13 +116,13 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
     args: address ? [address, HUMAN_HOUSE_ADDRESS] : undefined,
   })
 
-  const needsApprove = disputeDeposit && allowance !== undefined && (disputeDeposit as bigint) > (allowance as bigint)
+  const needsApprove = deposit > (allowance as bigint)
   const validMarketId = /^\d+$/.test(marketId)
 
   return (
     <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
       <h3>Raise Dispute</h3>
-      {disputeDeposit && <p>Required deposit: {formatEther(disputeDeposit as bigint)} CORN</p>}
+      {deposit > 0n && <p>Required deposit: {formatEther(deposit)} CORN</p>}
       <div style={{ marginBottom: 8 }}>
         <label>Market ID: </label>
         <input value={marketId} onChange={e => setMarketId(e.target.value)} placeholder="Market ID" style={{ marginRight: 8 }} />
@@ -144,7 +145,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
               address: CORN_TOKEN_ADDRESS,
               abi: cornTokenABI,
               functionName: 'approve',
-              args: [HUMAN_HOUSE_ADDRESS, disputeDeposit as bigint],
+              args: [HUMAN_HOUSE_ADDRESS, deposit],
             }, { onSuccess: () => refetchAllowance() })}
             style={{ marginRight: 8 }}
           >

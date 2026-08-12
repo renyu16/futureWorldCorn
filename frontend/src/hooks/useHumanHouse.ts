@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, usePublicClient } from 'wagmi'
+import { useReadContract, useWriteContract } from 'wagmi'
 import { HUMAN_HOUSE_ADDRESS, humanHouseABI } from '../contracts/abi'
 
 // Read hooks

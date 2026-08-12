@@ -29,9 +29,11 @@ function MarketCard({ id, onSelect }: { id: number; onSelect: (id: number) => vo
 }
 
 export function MarketList({ onSelect }: Props) {
-  const { data: count, isLoading } = useMarketCount()
+  const { data: count, isLoading, isError, error, isPending, isFetched } = useMarketCount()
 
   if (isLoading) return <div>Loading markets...</div>
+  if (isPending && !isFetched) return <div>Pending markets...</div>
+  if (isError) return <div>Market count error: {String(error?.shortMessage || error?.message || error)}</div>
 
   const total = Number(count ?? 0)
 

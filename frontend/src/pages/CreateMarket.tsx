@@ -19,7 +19,7 @@ export function CreateMarket() {
       address: PREDICTION_MARKET_ADDRESS,
       abi: predictionMarketABI,
       functionName: 'createMarket',
-      args: [question, deadlineUnix, fee],
+      args: [question, Number(deadlineUnix), fee],
     })
 
     setStatus('Transaction submitted. Check wallet to confirm.')

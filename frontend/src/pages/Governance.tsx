@@ -192,7 +192,14 @@ export function Governance() {
   useEffect(() => {
     if (!publicClient) return
     setLoading(true)
-    publicClient.getLogs({
+    ;(async () => {
+      if (!TOKEN_HOUSE_ADDRESS.startsWith('0x') || TOKEN_HOUSE_ADDRESS.length < 42) {
+        setLoading(false)
+        return
+      }
+      const latestBlock = await publicClient.getBlockNumber()
+      const fromBlock = latestBlock > 100n ? latestBlock - 100n : 0n
+      publicClient.getLogs({
       address: TOKEN_HOUSE_ADDRESS,
       event: {
         type: 'event',
@@ -209,7 +216,7 @@ export function Governance() {
           { type: 'string', name: 'description', indexed: false },
         ],
       },
-      fromBlock: 0n,
+      fromBlock,
       toBlock: 'latest',
     }).then(logs => {
       setProposals((logs as any[]).map(l => ({
@@ -218,6 +225,7 @@ export function Governance() {
       })).reverse())
       setLoading(false)
     }).catch(() => setLoading(false))
+    })()
   }, [publicClient])
 
   if (selectedId !== null) {

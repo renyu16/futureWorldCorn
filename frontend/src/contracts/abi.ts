@@ -1,3 +1,5 @@
+import { parseAbi } from 'viem'
+
 export const CORN_TOKEN_ADDRESS = '0x6a07C7b64702E67f32d14f55F26dAAc94082B981'
 export const PREDICTION_MARKET_ADDRESS = '0xAecA3704114B03d2d85f6EC5C4df83b277A657bb'
 
@@ -28,7 +30,7 @@ export function getConfig(chainId: number): ContractAddresses {
   return config
 }
 
-export const cornTokenABI = [
+export const cornTokenABI = parseAbi([
   'function balanceOf(address owner) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -38,9 +40,9 @@ export const cornTokenABI = [
   'function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
   'event Transfer(address indexed from, address indexed to, uint256 value)',
   'event Approval(address indexed owner, address indexed spender, uint256 value)',
-] as const
+])
 
-export const predictionMarketABI = [
+export const predictionMarketABI = parseAbi([
   'function createMarket(string question, uint40 deadline, uint16 feeBps)',
   'function bet(uint256 marketId, uint8 outcome, uint256 amount)',
   'function resolveMarket(uint256 marketId, bool result)',
@@ -59,11 +61,11 @@ export const predictionMarketABI = [
   'event BetPlaced(uint256 indexed id, address indexed user, uint8 outcome, uint256 amount)',
   'event MarketResolved(uint256 indexed id, bool result)',
   'event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount)',
-] as const
+])
 
 export const GOV_CORN_TOKEN_ADDRESS = '0x...'
 
-export const govCrownTokenABI = [
+export const govCrownTokenABI = parseAbi([
   'function depositFor(address account, uint256 amount)',
   'function withdrawTo(address account, uint256 amount)',
   'function delegate(address delegatee)',
@@ -74,11 +76,11 @@ export const govCrownTokenABI = [
   'function approve(address spender, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)',
   'event Transfer(address indexed from, address indexed to, uint256 value)',
-] as const
+])
 
 export const TOKEN_HOUSE_ADDRESS = '0x...'
 
-export const tokenHouseABI = [
+export const tokenHouseABI = parseAbi([
   'function state(uint256 proposalId) view returns (uint8)',
   'function proposalProposer(uint256 proposalId) view returns (address)',
   'function proposalDeadline(uint256 proposalId) view returns (uint256)',
@@ -94,11 +96,11 @@ export const tokenHouseABI = [
   'function getVotes(address account, uint256 blockNumber) view returns (uint256)',
   'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) view returns (uint256)',
   'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
-] as const
+])
 
 export const HUMAN_HOUSE_ADDRESS = '0x...'
 
-export const humanHouseABI = [
+export const humanHouseABI = parseAbi([
   'function raiseDispute(uint256 marketId, uint8 disputeType, string reason)',
   'function vote(uint256 disputeId, bool support, uint256 root, uint256 nullifierHash, uint256[8] proof)',
   'function executeDispute(uint256 disputeId)',
@@ -110,4 +112,4 @@ export const humanHouseABI = [
   'event DisputeCreated(uint256 indexed disputeId, uint256 indexed marketId, uint8 disputeType, string reason)',
   'event VoteCast(uint256 indexed disputeId, bool support)',
   'event DisputeExecuted(uint256 indexed disputeId, uint8 outcome, uint256 votesFor, uint256 votesAgainst)',
-] as const
+])

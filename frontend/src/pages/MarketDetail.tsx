@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { useMarketTuple, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
 import { useTokenBalance, useTokenAllowance, useWriteApprove } from '../hooks/useToken'
-import { CORN_TOKEN_ADDRESS, PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
+import { CORN_TOKEN_ADDRESS, cornTokenABI, PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
 
 interface Props {
   marketId: number
@@ -48,9 +48,7 @@ export function MarketDetail({ marketId }: Props) {
     if (userAllowance < parseFloat(betAmount || '0')) {
       approve({
         address: CORN_TOKEN_ADDRESS,
-        abi: [
-          'function approve(address spender, uint256 amount) returns (bool)',
-        ],
+        abi: cornTokenABI,
         functionName: 'approve',
         args: [PREDICTION_MARKET_ADDRESS, amountParsed],
       })

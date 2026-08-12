@@ -50,6 +50,9 @@ export function useExecuteDispute() {
 
 // Event log fetcher
 export async function fetchDisputeCreatedLogs(publicClient: any) {
+  if (!HUMAN_HOUSE_ADDRESS.startsWith('0x') || HUMAN_HOUSE_ADDRESS.length < 42) return []
+  const latest = await publicClient.getBlockNumber()
+  const fromBlock = latest > 100n ? latest - 100n : 0n
   return publicClient.getLogs({
     address: HUMAN_HOUSE_ADDRESS,
     event: {
@@ -62,7 +65,7 @@ export async function fetchDisputeCreatedLogs(publicClient: any) {
         { type: 'string', name: 'reason' },
       ],
     },
-    fromBlock: 0n,
+    fromBlock,
     toBlock: 'latest',
   })
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useAccount } from 'wagmi'
-import { useMarket, useWriteBet, useWriteClaimReward } from '../hooks/useMarket'
+import { useAccount, useReadContract } from 'wagmi'
+import { useMarket, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
 import { useTokenBalance, useTokenAllowance, useWriteApprove } from '../hooks/useToken'
 import { CORN_TOKEN_ADDRESS, PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
 
@@ -13,9 +13,15 @@ export function MarketDetail({ marketId }: Props) {
   const { data: market, isLoading } = useMarket(marketId)
   const { data: balance } = useTokenBalance(address)
   const { data: allowance } = useTokenAllowance(address, PREDICTION_MARKET_ADDRESS)
+  const { data: owner } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'owner',
+  })
   const { writeContract: approve } = useWriteApprove()
   const { writeContract: bet } = useWriteBet()
   const { writeContract: claim } = useWriteClaimReward()
+  const { writeContract: resolve } = useWriteResolveMarket()
 
   const [betAmount, setBetAmount] = useState('')
   const [selectedOutcome, setSelectedOutcome] = useState<number>(0)
@@ -32,6 +38,10 @@ export function MarketDetail({ marketId }: Props) {
   const isOpen = status === 0
   const isResolved = status === 1
   const amountParsed = BigInt(Math.floor(parseFloat(betAmount || '0') * 1e18))
+
+  // owner + deadline checks for resolve UI
+  const isOwner = address && owner ? address.toLowerCase() === (owner as string).toLowerCase() : false
+  const deadlinePassed = Number(deadline) * 1000 < Date.now()
 
   const handleBet = async () => {
     if (!address || amountParsed <= 0n) return
@@ -60,6 +70,15 @@ export function MarketDetail({ marketId }: Props) {
       abi: predictionMarketABI,
       functionName: 'claimReward',
       args: [BigInt(marketId)],
+    })
+  }
+
+  const handleResolve = async (win: boolean) => {
+    resolve({
+      address: PREDICTION_MARKET_ADDRESS,
+      abi: predictionMarketABI,
+      functionName: 'resolveMarket',
+      args: [BigInt(marketId), win],
     })
   }
 
@@ -100,6 +119,16 @@ export function MarketDetail({ marketId }: Props) {
       {isResolved && address && (
         <div style={{ marginTop: 16 }}>
           <button onClick={handleClaim}>Claim Reward</button>
+        </div>
+      )}
+
+      {isOpen && isOwner && deadlinePassed && (
+        <div style={{ marginTop: 16 }}>
+          <h3>Resolve Market</h3>
+          <p>Deadline has passed. Choose the winning outcome.</p>
+          <button onClick={() => handleResolve(true)}>Resolve YES Wins</button>
+          {' '}
+          <button onClick={() => handleResolve(false)}>Resolve NO Wins</button>
         </div>
       )}
     </div>

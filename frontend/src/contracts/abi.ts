@@ -54,6 +54,7 @@ export const predictionMarketABI = [
   'function defaultFeeBps() view returns (uint16)',
   'function feeCollector() view returns (address)',
   'function resolvers(address) view returns (bool)',
+  'function owner() view returns (address)',
   'event MarketCreated(uint256 indexed id, string question, uint40 deadline)',
   'event BetPlaced(uint256 indexed id, address indexed user, uint8 outcome, uint256 amount)',
   'event MarketResolved(uint256 indexed id, bool result)',

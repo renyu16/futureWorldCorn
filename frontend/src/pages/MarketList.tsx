@@ -23,7 +23,7 @@ function MarketCard({ id, onSelect }: { id: number; onSelect: (id: number) => vo
       <p>Deadline: {deadlineStr}</p>
       <p>Status: {statusLabel}{status === 1 && ` - ${result ? 'YES' : 'NO'}`}</p>
       <p>YES Pool: {yesPool.toFixed(4)} | NO Pool: {noPool.toFixed(4)}</p>
-      <button onClick={() => onSelect(id)} disabled={status === 1}>View Details</button>
+      <button onClick={() => onSelect(id)}>View Details</button>
     </div>
   )
 }

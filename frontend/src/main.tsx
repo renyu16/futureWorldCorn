@@ -5,6 +5,7 @@ import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { defineChain } from 'viem'
 import '@rainbow-me/rainbowkit/styles.css'
+import './globals.css'
 import App from './App'
 
 const worldChain = defineChain({

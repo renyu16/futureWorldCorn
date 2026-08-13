@@ -9,10 +9,21 @@ import {
   useDispute, useDisputeDeposit, useRaiseDispute, useVote, useExecuteDispute,
   fetchDisputeCreatedLogs,
 } from '../hooks/useHumanHouse'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ArrowLeft } from 'lucide-react'
 
 const DISPUTE_TYPE: Record<number, string> = { 0: 'Oracle Result', 1: 'Market Content' }
 const DISPUTE_STATE: Record<number, string> = { 0: 'Active', 1: 'Approved', 2: 'Rejected' }
-const STATE_COLOR: Record<number, string> = { 0: '#5bc0de', 1: '#5cb85c', 2: '#d9534f' }
+const STATE_VARIANT: Record<number, 'default' | 'secondary' | 'success' | 'destructive'> = {
+  0: 'default',
+  1: 'success',
+  2: 'destructive',
+}
 
 const MOCK_ROOT = 0n
 const MOCK_NULLIFIER_HASH = 0n
@@ -31,70 +42,91 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   const { writeContract: writeVote } = useVote()
   const { writeContract: writeExecute } = useExecuteDispute()
 
-  if (!dispute) return <p>Loading dispute #{id.toString()}...</p>
+  if (!dispute) return <p className="text-muted">Loading dispute #{id.toString()}...</p>
 
   const [marketId, disputeType, state, initiator, deposit, deadline, reason, votesFor, votesAgainst] = dispute as any
   const isActive = Number(state) === 0
   const isExpired = Date.now() / 1000 > Number(deadline)
 
   return (
-    <div>
-      <button onClick={onBack} style={{ marginBottom: 12 }}>&larr; Back</button>
-      <h3>Dispute #{id.toString()}</h3>
-      <p>Market ID: {marketId.toString()}</p>
-      <p>Type: {DISPUTE_TYPE[disputeType] || 'Unknown'}</p>
-      <p>State: <span style={{ color: STATE_COLOR[state] }}>{DISPUTE_STATE[state] || 'Unknown'}</span></p>
-      <p>Initiator: <code>{initiator}</code></p>
-      <p>Deposit: {formatEther(deposit)} CORN</p>
-      <p>Deadline: {new Date(Number(deadline) * 1000).toLocaleString()}</p>
-      <p>Reason: {reason}</p>
-      <p>For: <strong>{formatEther(votesFor)}</strong></p>
-      <p>Against: <strong>{formatEther(votesAgainst)}</strong></p>
+    <div className="space-y-4">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-xl">Dispute #{id.toString()}</CardTitle>
+            <Badge variant={STATE_VARIANT[Number(state)] || 'secondary'}>{DISPUTE_STATE[Number(state)] || 'Unknown'}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+            <div><span className="text-muted">Market ID:</span><br />{marketId.toString()}</div>
+            <div><span className="text-muted">Type:</span><br />{DISPUTE_TYPE[disputeType] || 'Unknown'}</div>
+            <div><span className="text-muted">Initiator:</span><br /><code className="break-all font-mono">{initiator}</code></div>
+            <div><span className="text-muted">Deposit:</span><br />{formatEther(deposit)} CORN</div>
+            <div><span className="text-muted">Deadline:</span><br />{new Date(Number(deadline) * 1000).toLocaleString()}</div>
+          </div>
+          <div className="text-sm"><span className="text-muted">Reason:</span><br />{reason}</div>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><span className="text-yes font-medium">For:</span><br />{formatEther(votesFor)}</div>
+            <div><span className="text-no font-medium">Against:</span><br />{formatEther(votesAgainst)}</div>
+          </div>
 
-      {isActive && !isExpired && address && (
-        <div style={{ marginTop: 16, border: '1px solid #ccc', padding: 12, borderRadius: 6 }}>
-          <h4>World ID Verification (Mock)</h4>
-          <p style={{ fontSize: 12, color: '#888' }}>Currently using mock proof. Real World ID integration coming soon.</p>
-          <button
-            onClick={() => writeVote({
-              address: HUMAN_HOUSE_ADDRESS,
-              abi: humanHouseABI,
-              functionName: 'vote',
-              args: [id, true, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
-            })}
-            style={{ marginRight: 8, background: '#5cb85c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-          >
-            Vote For
-          </button>
-          <button
-            onClick={() => writeVote({
-              address: HUMAN_HOUSE_ADDRESS,
-              abi: humanHouseABI,
-              functionName: 'vote',
-              args: [id, false, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
-            })}
-            style={{ background: '#d9534f', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-          >
-            Vote Against
-          </button>
-        </div>
-      )}
+          {isActive && !isExpired && address && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1">
+                <p className="font-medium">World ID Verification (Mock)</p>
+                <p className="text-xs text-muted">Currently using mock proof. Real World ID integration coming soon.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  className="border-transparent bg-yes text-white hover:bg-yes/90"
+                  onClick={() => writeVote({
+                    address: HUMAN_HOUSE_ADDRESS,
+                    abi: humanHouseABI,
+                    functionName: 'vote',
+                    args: [id, true, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
+                  })}
+                >
+                  Vote For
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-transparent bg-no text-white hover:bg-no/90"
+                  onClick={() => writeVote({
+                    address: HUMAN_HOUSE_ADDRESS,
+                    abi: humanHouseABI,
+                    functionName: 'vote',
+                    args: [id, false, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
+                  })}
+                >
+                  Vote Against
+                </Button>
+              </div>
+            </div>
+          )}
 
-      {isActive && isExpired && address && (
-        <div style={{ marginTop: 16, border: '1px solid #ccc', padding: 12, borderRadius: 6 }}>
-          <button
-            onClick={() => writeExecute({
-              address: HUMAN_HOUSE_ADDRESS,
-              abi: humanHouseABI,
-              functionName: 'executeDispute',
-              args: [id],
-            })}
-            style={{ background: '#f0ad4e', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-          >
-            Execute Dispute
-          </button>
-        </div>
-      )}
+          {isActive && isExpired && address && (
+            <div className="border-t border-border pt-4">
+              <Button
+                variant="outline"
+                className="border-transparent bg-amber-500 text-white hover:bg-amber-600"
+                onClick={() => writeExecute({
+                  address: HUMAN_HOUSE_ADDRESS,
+                  abi: humanHouseABI,
+                  functionName: 'executeDispute',
+                  args: [id],
+                })}
+              >
+                Execute Dispute
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -120,51 +152,60 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
   const validMarketId = /^\d+$/.test(marketId)
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
-      <h3>Raise Dispute</h3>
-      {deposit > 0n && <p>Required deposit: {formatEther(deposit)} CORN</p>}
-      <div style={{ marginBottom: 8 }}>
-        <label>Market ID: </label>
-        <input value={marketId} onChange={e => setMarketId(e.target.value)} placeholder="Market ID" style={{ marginRight: 8 }} />
-      </div>
-      <div style={{ marginBottom: 8 }}>
-        <label>Type: </label>
-        <select value={disputeType} onChange={e => setDisputeType(e.target.value)}>
-          <option value="0">Oracle Result</option>
-          <option value="1">Market Content</option>
-        </select>
-      </div>
-      <div style={{ marginBottom: 8 }}>
-        <label>Reason: </label>
-        <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why this result is wrong" style={{ width: 400 }} />
-      </div>
-      <div>
-        {needsApprove && (
-          <button
-            onClick={() => writeApprove({
-              address: CORN_TOKEN_ADDRESS,
-              abi: cornTokenABI,
-              functionName: 'approve',
-              args: [HUMAN_HOUSE_ADDRESS, deposit],
-            }, { onSuccess: () => refetchAllowance() })}
-            style={{ marginRight: 8 }}
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Raise Dispute</CardTitle>
+        {deposit > 0n && <CardDescription>Required deposit: {formatEther(deposit)} CORN</CardDescription>}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <Label>Market ID</Label>
+          <Input value={marketId} onChange={e => setMarketId(e.target.value)} placeholder="Market ID" />
+        </div>
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <Select value={disputeType} onValueChange={setDisputeType}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Oracle Result</SelectItem>
+              <SelectItem value="1">Market Content</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Reason</Label>
+          <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why this result is wrong" />
+        </div>
+        <div className="flex flex-wrap gap-2 pt-2">
+          {needsApprove && (
+            <Button
+              variant="outline"
+              onClick={() => writeApprove({
+                address: CORN_TOKEN_ADDRESS,
+                abi: cornTokenABI,
+                functionName: 'approve',
+                args: [HUMAN_HOUSE_ADDRESS, deposit],
+              }, { onSuccess: () => refetchAllowance() })}
+            >
+              Approve CORN
+            </Button>
+          )}
+          <Button
+            disabled={!validMarketId || !reason || !!needsApprove}
+            onClick={() => writeContract({
+              address: HUMAN_HOUSE_ADDRESS,
+              abi: humanHouseABI,
+              functionName: 'raiseDispute',
+              args: [BigInt(marketId), Number(disputeType), reason],
+            }, { onSuccess: () => { setMarketId(''); setReason(''); onCreated() } })}
           >
-            Approve CORN
-          </button>
-        )}
-        <button
-          disabled={!validMarketId || !reason || !!needsApprove}
-          onClick={() => writeContract({
-            address: HUMAN_HOUSE_ADDRESS,
-            abi: humanHouseABI,
-            functionName: 'raiseDispute',
-            args: [BigInt(marketId), Number(disputeType), reason],
-          }, { onSuccess: () => { setMarketId(''); setReason(''); onCreated() } })}
-        >
-          Raise Dispute
-        </button>
-      </div>
-    </div>
+            Raise Dispute
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -174,19 +215,23 @@ function DisputeRow({ dispute: d, onSelect }: { dispute: DisputeInfo; onSelect: 
   const deadline = dispute ? (dispute as any)[5] : undefined
 
   return (
-    <tr style={{ borderBottom: '1px solid #eee' }}>
-      <td style={{ padding: 8 }}>{d.id.toString()}</td>
-      <td style={{ padding: 8 }}>{d.marketId.toString()}</td>
-      <td style={{ padding: 8 }}>{DISPUTE_TYPE[d.disputeType]}</td>
-      <td style={{ padding: 8 }}>
-        <span style={{ color: STATE_COLOR[state] || '#888', fontWeight: 'bold' }}>
-          {DISPUTE_STATE[state] || '—'}
-        </span>
-      </td>
-      <td style={{ padding: 8 }}>{deadline ? new Date(Number(deadline) * 1000).toLocaleDateString() : '—'}</td>
-      <td style={{ padding: 8 }}>{d.reason.length > 40 ? d.reason.slice(0, 40) + '...' : d.reason}</td>
-      <td style={{ padding: 8 }}><button onClick={onSelect}>View</button></td>
-    </tr>
+    <Card>
+      <CardContent className="flex items-center justify-between gap-4 p-4">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-semibold">#{d.id.toString()}</span>
+            <Badge variant={STATE_VARIANT[Number(state)] || 'secondary'}>{DISPUTE_STATE[Number(state)] || '—'}</Badge>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+            <span>Market: {d.marketId.toString()}</span>
+            <span>{DISPUTE_TYPE[d.disputeType]}</span>
+            <span>Deadline: {deadline ? new Date(Number(deadline) * 1000).toLocaleDateString() : '—'}</span>
+            <span className="truncate">{d.reason.length > 40 ? d.reason.slice(0, 40) + '...' : d.reason}</span>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={onSelect}>View</Button>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -222,28 +267,15 @@ export function HumanHouse() {
   }
 
   return (
-    <div>
-      <h2>HumanHouse Disputes</h2>
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">HumanHouse Disputes</h2>
       <RaiseDispute onCreated={() => setLoading(true)} />
-      {!address ? <p>Connect your wallet to view disputes.</p> : loading ? <p>Loading disputes...</p> : error ? <p style={{ color: '#d9534f' }}>{error}</p> : disputes.length === 0 ? <p>No disputes yet.</p> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: 8 }}>ID</th>
-              <th style={{ padding: 8 }}>Market</th>
-              <th style={{ padding: 8 }}>Type</th>
-              <th style={{ padding: 8 }}>State</th>
-              <th style={{ padding: 8 }}>Deadline</th>
-              <th style={{ padding: 8 }}>Reason</th>
-              <th style={{ padding: 8 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {disputes.map(d => (
-              <DisputeRow key={d.id.toString()} dispute={d} onSelect={() => setSelectedId(d.id)} />
-            ))}
-          </tbody>
-        </table>
+      {!address ? <p className="text-muted">Connect your wallet to view disputes.</p> : loading ? <p className="text-muted">Loading disputes...</p> : error ? <p className="text-no">{error}</p> : disputes.length === 0 ? <p className="text-muted">No disputes yet.</p> : (
+        <div className="space-y-3">
+          {disputes.map(d => (
+            <DisputeRow key={d.id.toString()} dispute={d} onSelect={() => setSelectedId(d.id)} />
+          ))}
+        </div>
       )}
     </div>
   )

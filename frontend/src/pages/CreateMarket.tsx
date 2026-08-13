@@ -15,11 +15,19 @@ export function CreateMarket() {
 
   const handleCreate = async () => {
     if (!question || !deadline) return
-    const deadlineUnix = BigInt(Math.floor(new Date(deadline).getTime() / 1000))
+    const deadlineUnix = Math.floor(new Date(deadline).getTime() / 1000)
+    if (deadlineUnix <= Math.floor(Date.now() / 1000)) {
+      setStatus('Deadline must be in the future.')
+      return
+    }
     const fee = feeBps ? Number(feeBps) : 0
+    if (fee > 1000) {
+      setStatus('Fee cannot exceed 1000 basis points (10%).')
+      return
+    }
     writeContract({
       address: PREDICTION_MARKET_ADDRESS, abi: predictionMarketABI, functionName: 'createMarket',
-      args: [question, Number(deadlineUnix), fee],
+      args: [question, deadlineUnix, fee],
     })
     setStatus('Transaction submitted. Check wallet to confirm.')
   }
@@ -41,7 +49,7 @@ export function CreateMarket() {
         </div>
         <div className="space-y-2">
           <Label>Fee (basis points, optional)</Label>
-          <Input type="number" value={feeBps} onChange={(e) => setFeeBps(e.target.value)} placeholder="e.g. 250 = 2.5%" min="0" max="10000" />
+          <Input type="number" value={feeBps} onChange={(e) => setFeeBps(e.target.value)} placeholder="e.g. 250 = 2.5%" min="0" max="1000" />
         </div>
         <Button className="w-full" disabled={!question || !deadline} onClick={handleCreate}>Create Market</Button>
         {status && <p className="text-sm text-muted">{status}</p>}

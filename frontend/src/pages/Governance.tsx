@@ -10,16 +10,23 @@ import {
   useProposalDeadline, useProposalSnapshot, useCastVote,
   usePropose, useProposalThreshold,
 } from '../hooks/useGovernance'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ArrowLeft } from 'lucide-react'
 
 const STATE_LABEL: Record<string, string> = {
   Pending: 'Pending', Active: 'Active', Canceled: 'Canceled', Defeated: 'Defeated',
   Succeeded: 'Succeeded', Queued: 'Queued', Expired: 'Expired', Executed: 'Executed',
 }
 
-const STATE_COLOR: Record<string, string> = {
-  Pending: '#f0ad4e', Active: '#5bc0de', Succeeded: '#5cb85c',
-  Queued: '#5cb85c', Executed: '#5cb85c', Defeated: '#d9534f',
-  Canceled: '#888', Expired: '#888',
+const STATE_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'destructive'> = {
+  Pending: 'secondary', Active: 'default', Succeeded: 'success',
+  Queued: 'success', Executed: 'success', Defeated: 'destructive',
+  Canceled: 'secondary', Expired: 'secondary',
 }
 
 function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
@@ -43,50 +50,69 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   const abstain = votes ? (votes as [bigint, bigint, bigint])[2] : undefined
 
   return (
-    <div>
-      <button onClick={onBack} style={{ marginBottom: 12 }}>&larr; Back</button>
-      <h3>Proposal #{id.toString()}</h3>
-      <p>State: <span style={{ color: STATE_COLOR[state as string || ''] }}>{state as string || '—'}</span></p>
-      <p>Proposer: <code>{proposer as string || '—'}</code></p>
-      <p>Snapshot Block: {snapshot?.toString() || '—'}</p>
-      <p>Deadline Block: {deadline?.toString() || '—'}</p>
-      <p>For: <strong>{forVotes !== undefined ? formatEther(forVotes) : '—'}</strong> govCORN</p>
-      <p>Against: <strong>{against !== undefined ? formatEther(against) : '—'}</strong> govCORN</p>
-      <p>Abstain: <strong>{abstain !== undefined ? formatEther(abstain) : '—'}</strong> govCORN</p>
+    <div className="space-y-4">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-xl">Proposal #{id.toString()}</CardTitle>
+            <Badge variant={STATE_VARIANT[state as string || ''] || 'secondary'}>{state as string || '—'}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+            <div><span className="text-muted">Proposer:</span><br /><code className="break-all font-mono">{proposer as string || '—'}</code></div>
+            <div><span className="text-muted">Snapshot Block:</span><br />{snapshot?.toString() || '—'}</div>
+            <div><span className="text-muted">Deadline Block:</span><br />{deadline?.toString() || '—'}</div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div><span className="text-yes font-medium">For:</span><br />{forVotes !== undefined ? formatEther(forVotes) : '—'} govCORN</div>
+            <div><span className="text-no font-medium">Against:</span><br />{against !== undefined ? formatEther(against) : '—'} govCORN</div>
+            <div><span className="text-muted font-medium">Abstain:</span><br />{abstain !== undefined ? formatEther(abstain) : '—'} govCORN</div>
+          </div>
 
-      {state === 'Active' && address && (
-        <div style={{ marginTop: 16 }}>
-          <p>Your Voting Power: {userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</p>
-          {userVotes !== undefined && (userVotes as bigint) > 0n && (
-            <div>
-              <button
-                onClick={() => writeContract({
-                  address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
-                  functionName: 'castVote',
-                  args: [id, 1],
-                })}
-                style={{ marginRight: 8, background: '#5cb85c', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-              >For</button>
-              <button
-                onClick={() => writeContract({
-                  address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
-                  functionName: 'castVote',
-                  args: [id, 0],
-                })}
-                style={{ marginRight: 8, background: '#d9534f', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-              >Against</button>
-              <button
-                onClick={() => writeContract({
-                  address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
-                  functionName: 'castVote',
-                  args: [id, 2],
-                })}
-                style={{ background: '#888', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer' }}
-              >Abstain</button>
+          {state === 'Active' && address && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <p className="text-sm text-muted">
+                Your Voting Power: <span className="font-medium text-foreground">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span>
+              </p>
+              {userVotes !== undefined && (userVotes as bigint) > 0n && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    className="border-transparent bg-yes text-white hover:bg-yes/90"
+                    onClick={() => writeContract({
+                      address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
+                      functionName: 'castVote',
+                      args: [id, 1],
+                    })}
+                  >For</Button>
+                  <Button
+                    variant="outline"
+                    className="border-transparent bg-no text-white hover:bg-no/90"
+                    onClick={() => writeContract({
+                      address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
+                      functionName: 'castVote',
+                      args: [id, 0],
+                    })}
+                  >Against</Button>
+                  <Button
+                    variant="outline"
+                    className="border-transparent bg-muted text-white hover:bg-muted/90"
+                    onClick={() => writeContract({
+                      address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
+                      functionName: 'castVote',
+                      args: [id, 2],
+                    })}
+                  >Abstain</Button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -141,42 +167,43 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
-      <h3>Create Proposal</h3>
-      <p>Voting Power: <strong>{userVotes ? formatEther(userVotes as bigint) : '0'}</strong> govCORN</p>
-      <p>Required: <strong>{threshold ? formatEther(threshold as bigint) : '-'}</strong> govCORN (1% of supply)</p>
+    <div className="space-y-4">
+      <div className="space-y-1 rounded-lg bg-muted/10 p-3 text-sm">
+        <p>Voting Power: <span className="font-medium">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span></p>
+        <p>Required: <span className="font-medium">{threshold ? formatEther(threshold as bigint) : '-'} govCORN</span> <span className="text-muted">(1% of supply)</span></p>
+      </div>
       {!canPropose && threshold !== undefined && (
-        <p style={{ color: '#d9534f', fontSize: 12 }}>Insufficient voting power to propose. Delegate or acquire more govCORN.</p>
+        <p className="text-sm text-no">Insufficient voting power to propose. Delegate or acquire more govCORN.</p>
       )}
-      <div style={{ marginBottom: 8 }}>
-        <label>Target address: </label><br />
-        <input value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." style={{ width: 400 }} />
+      <div className="space-y-2">
+        <Label>Target address</Label>
+        <Input value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." className="font-mono" />
       </div>
-      <div style={{ marginBottom: 8 }}>
-        <label>ETH value (wei): </label><br />
-        <input value={value} onChange={e => setValue(e.target.value)} placeholder="0" style={{ width: 200 }} />
+      <div className="space-y-2">
+        <Label>ETH value (wei)</Label>
+        <Input value={value} onChange={e => setValue(e.target.value)} placeholder="0" />
       </div>
-      <div style={{ marginBottom: 8 }}>
-        <label>Function signature (optional, e.g. transfer(address,uint256)): </label><br />
-        <input value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" style={{ width: 400 }} />
+      <div className="space-y-2">
+        <Label>Function signature (optional)</Label>
+        <Input value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" />
       </div>
       {funcSig && (
-        <div style={{ marginBottom: 8 }}>
-          <label>Arguments (JSON array): </label><br />
-          <input value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' style={{ width: 400 }} />
+        <div className="space-y-2">
+          <Label>Arguments (JSON array)</Label>
+          <Input value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' className="font-mono" />
         </div>
       )}
-      <div style={{ marginBottom: 8 }}>
-        <label>Description: </label><br />
-        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} style={{ width: 400 }} />
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          rows={3}
+          className="flex min-h-[80px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
       </div>
-      {error && <p style={{ color: '#d9534f', fontSize: 12 }}>{error}</p>}
-      <button
-        disabled={!canPropose || !validAddress || !description}
-        onClick={handleSubmit}
-      >
-        Submit Proposal
-      </button>
+      {error && <p className="text-sm text-no">{error}</p>}
+      <Button className="w-full" disabled={!canPropose || !validAddress || !description} onClick={handleSubmit}>Submit Proposal</Button>
     </div>
   )
 }
@@ -200,31 +227,31 @@ export function Governance() {
       const latestBlock = await publicClient.getBlockNumber()
       const fromBlock = latestBlock > 100n ? latestBlock - 100n : 0n
       publicClient.getLogs({
-      address: TOKEN_HOUSE_ADDRESS,
-      event: {
-        type: 'event',
-        name: 'ProposalCreated',
-        inputs: [
-          { type: 'uint256', name: 'proposalId', indexed: false },
-          { type: 'address', name: 'proposer', indexed: false },
-          { type: 'address[]', name: 'targets', indexed: false },
-          { type: 'uint256[]', name: 'values', indexed: false },
-          { type: 'string[]', name: 'signatures', indexed: false },
-          { type: 'bytes[]', name: 'calldatas', indexed: false },
-          { type: 'uint256', name: 'voteStart', indexed: false },
-          { type: 'uint256', name: 'voteEnd', indexed: false },
-          { type: 'string', name: 'description', indexed: false },
-        ],
-      },
-      fromBlock,
-      toBlock: 'latest',
-    }).then(logs => {
-      setProposals((logs as any[]).map(l => ({
-        id: (l.args as any).proposalId as bigint,
-        description: (l.args as any).description as string,
-      })).reverse())
-      setLoading(false)
-    }).catch(() => setLoading(false))
+        address: TOKEN_HOUSE_ADDRESS,
+        event: {
+          type: 'event',
+          name: 'ProposalCreated',
+          inputs: [
+            { type: 'uint256', name: 'proposalId', indexed: false },
+            { type: 'address', name: 'proposer', indexed: false },
+            { type: 'address[]', name: 'targets', indexed: false },
+            { type: 'uint256[]', name: 'values', indexed: false },
+            { type: 'string[]', name: 'signatures', indexed: false },
+            { type: 'bytes[]', name: 'calldatas', indexed: false },
+            { type: 'uint256', name: 'voteStart', indexed: false },
+            { type: 'uint256', name: 'voteEnd', indexed: false },
+            { type: 'string', name: 'description', indexed: false },
+          ],
+        },
+        fromBlock,
+        toBlock: 'latest',
+      }).then(logs => {
+        setProposals((logs as any[]).map(l => ({
+          id: (l.args as any).proposalId as bigint,
+          description: (l.args as any).description as string,
+        })).reverse())
+        setLoading(false)
+      }).catch(() => setLoading(false))
     })()
   }, [publicClient])
 
@@ -233,33 +260,30 @@ export function Governance() {
   }
 
   return (
-    <div>
-      <h2>Governance</h2>
-      {address && (
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{ marginBottom: 16 }}
-        >
-          {showForm ? 'Cancel' : 'Create Proposal'}
-        </button>
-      )}
-      {showForm && <CreateProposal onCreated={() => { setShowForm(false); setLoading(true) }} />}
-      {loading ? <p>Loading proposals...</p> : proposals.length === 0 ? <p>No proposals yet.</p> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: 8 }}>ID</th>
-              <th style={{ padding: 8 }}>Description</th>
-              <th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {proposals.map(p => (
-              <ProposalRow key={p.id.toString()} proposal={p} onSelect={() => setSelectedId(p.id)} />
-            ))}
-          </tbody>
-        </table>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Governance</h2>
+        {address && (
+          <Button variant={showForm ? 'outline' : 'default'} onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : 'Create Proposal'}
+          </Button>
+        )}
+      </div>
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Proposal</DialogTitle>
+            <DialogDescription>Submit an on-chain governance proposal. Requires govCORN voting power above the threshold.</DialogDescription>
+          </DialogHeader>
+          <CreateProposal onCreated={() => { setShowForm(false); setLoading(true) }} />
+        </DialogContent>
+      </Dialog>
+      {loading ? <p className="text-muted">Loading proposals...</p> : proposals.length === 0 ? <p className="text-muted">No proposals yet.</p> : (
+        <div className="space-y-3">
+          {proposals.map(p => (
+            <ProposalRow key={p.id.toString()} proposal={p} onSelect={() => setSelectedId(p.id)} />
+          ))}
+        </div>
       )}
     </div>
   )
@@ -269,17 +293,17 @@ function ProposalRow({ proposal: p, onSelect }: { proposal: { id: bigint; descri
   const { data: state } = useProposalState(p.id)
   const desc = p.description.length > 100 ? p.description.slice(0, 100) + '…' : p.description
   return (
-    <tr style={{ borderBottom: '1px solid #eee' }}>
-      <td style={{ padding: 8 }}>{p.id.toString()}</td>
-      <td style={{ padding: 8 }}>{desc}</td>
-      <td style={{ padding: 8 }}>
-        <span style={{ color: STATE_COLOR[state as string || ''], fontWeight: 'bold' }}>
-          {STATE_LABEL[state as string || ''] || '—'}
-        </span>
-      </td>
-      <td style={{ padding: 8 }}>
-        <button onClick={onSelect}>View</button>
-      </td>
-    </tr>
+    <Card>
+      <CardContent className="flex items-center justify-between gap-4 p-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-semibold">#{p.id.toString()}</span>
+            <Badge variant={STATE_VARIANT[state as string || ''] || 'secondary'}>{STATE_LABEL[state as string || ''] || '—'}</Badge>
+          </div>
+          <p className="mt-1 truncate text-sm text-muted">{desc}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onSelect}>View</Button>
+      </CardContent>
+    </Card>
   )
 }

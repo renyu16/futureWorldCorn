@@ -27,7 +27,7 @@ export function Portfolio() {
   const { data: count } = useMarketCount()
   const { data: balance } = useTokenBalance(address)
   const total = Number(count ?? 0)
-  const ids = Array.from({ length: total }, (_, i) => i)
+  const ids = Array.from({ length: total }, (_, i) => i + 1)
 
   return (
     <div className="space-y-6">

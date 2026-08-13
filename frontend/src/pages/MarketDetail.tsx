@@ -13,9 +13,10 @@ import { ArrowLeft } from 'lucide-react'
 
 interface Props {
   marketId: number
+  onBack: () => void
 }
 
-export function MarketDetail({ marketId }: Props) {
+export function MarketDetail({ marketId, onBack }: Props) {
   const { address } = useAccount()
   const { data: market, isLoading } = useMarketTuple(marketId)
   const { data: balance } = useTokenBalance(address)
@@ -79,7 +80,7 @@ export function MarketDetail({ marketId }: Props) {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="text-muted">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back
       </Button>
       <Card>
@@ -100,7 +101,7 @@ export function MarketDetail({ marketId }: Props) {
             <span className="text-muted">Your Balance:</span> <span className="font-medium">{userBalance.toFixed(4)} CORN</span>
           </div>
 
-          {isOpen && address && (
+          {isOpen && address && !deadlinePassed && (
             <div className="space-y-3 border-t border-border pt-4">
               <h3 className="font-semibold">Place Bet</h3>
               <div className="space-y-2">

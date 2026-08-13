@@ -43,7 +43,7 @@ function App() {
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">
         {page === 'list' && <MarketList onSelect={(id) => { setSelectedMarket(id); setPage('detail') }} />}
-        {page === 'detail' && selectedMarket !== null && <MarketDetail marketId={selectedMarket} />}
+        {page === 'detail' && selectedMarket !== null && <MarketDetail marketId={selectedMarket} onBack={() => setPage('list')} />}
         {page === 'create' && <CreateMarket />}
         {page === 'portfolio' && <Portfolio />}
         {page === 'delegate' && <Delegate />}

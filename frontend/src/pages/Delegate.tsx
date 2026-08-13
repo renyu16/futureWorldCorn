@@ -31,7 +31,7 @@ export function Delegate() {
   })
   const { writeContract } = useWriteContract()
 
-  const depositAmt = parseEther(depositAmount || '0')
+  const depositAmt = parseEther(/^\d*\.?\d*$/.test(depositAmount) ? depositAmount : '0')
   const needsApprove = allowance !== undefined && depositAmt > 0n && depositAmt > (allowance as bigint)
   const refetchAll = () => { refetchCorn(); refetchGov(); refetchAllowance() }
 
@@ -54,7 +54,7 @@ export function Delegate() {
             <CardContent className="space-y-3">
               <div className="space-y-2">
                 <Label>Amount</Label>
-                <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" />
+                <Input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min="0" />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" disabled={!needsApprove || depositAmt === 0n} onClick={() => writeContract({ address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'approve', args: [GOV_CORN_TOKEN_ADDRESS, depositAmt] }, { onSuccess: () => refetchAllowance() })}>Approve</Button>
@@ -67,9 +67,9 @@ export function Delegate() {
             <CardContent className="space-y-3">
               <div className="space-y-2">
                 <Label>Amount</Label>
-                <Input value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" />
+                <Input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min="0" />
               </div>
-              <Button disabled={parseEther(withdrawAmount || '0') === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'withdrawTo', args: [address, parseEther(withdrawAmount || '0')] }, { onSuccess: () => refetchAll() })}>Withdraw</Button>
+              <Button disabled={/^\d*\.?\d*$/.test(withdrawAmount) && parseEther(withdrawAmount || '0') === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'withdrawTo', args: [address, parseEther(/^\d*\.?\d*$/.test(withdrawAmount) ? withdrawAmount : '0')] }, { onSuccess: () => refetchAll() })}>Withdraw</Button>
             </CardContent>
           </Card>
           <Card>

@@ -26,13 +26,13 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:gap-6">
+          <div className="hidden items-center gap-2 sm:flex">
             <TrendingUp className="h-6 w-6 text-primary" />
             <h1 className="text-lg font-bold">Prediction Master</h1>
           </div>
-          <Tabs value={page} onValueChange={setPage} className="flex-1">
-            <TabsList>
+          <Tabs value={page} onValueChange={setPage} className="min-w-0 flex-1">
+            <TabsList className="w-full justify-start overflow-x-auto">
               {navItems.map((item) => (
                 <TabsTrigger key={item.id} value={item.id}>{item.label}</TabsTrigger>
               ))}

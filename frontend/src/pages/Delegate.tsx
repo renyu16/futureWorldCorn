@@ -31,7 +31,9 @@ export function Delegate() {
   })
   const { writeContract } = useWriteContract()
 
-  const depositAmt = parseEther(/^\d*\.?\d*$/.test(depositAmount) ? depositAmount : '0')
+  const isNumeric = (v: string) => v !== '' && /^\d*\.?\d*$/.test(v)
+  const depositAmt = parseEther(isNumeric(depositAmount) ? depositAmount : '0')
+  const withdrawAmt = parseEther(isNumeric(withdrawAmount) ? withdrawAmount : '0')
   const needsApprove = allowance !== undefined && depositAmt > 0n && depositAmt > (allowance as bigint)
   const refetchAll = () => { refetchCorn(); refetchGov(); refetchAllowance() }
 
@@ -69,7 +71,7 @@ export function Delegate() {
                 <Label>Amount</Label>
                 <Input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min="0" />
               </div>
-              <Button disabled={/^\d*\.?\d*$/.test(withdrawAmount) && parseEther(withdrawAmount || '0') === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'withdrawTo', args: [address, parseEther(/^\d*\.?\d*$/.test(withdrawAmount) ? withdrawAmount : '0')] }, { onSuccess: () => refetchAll() })}>Withdraw</Button>
+              <Button disabled={withdrawAmt === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'withdrawTo', args: [address, withdrawAmt] }, { onSuccess: () => refetchAll() })}>Withdraw</Button>
             </CardContent>
           </Card>
           <Card>

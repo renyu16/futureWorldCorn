@@ -45,30 +45,30 @@ async function main() {
     record('market list reads chain (marketCount>0)', false, e.message.split('\n')[0])
   }
 
-  // market cards render
-  const cards = page.locator('div[style*="border-radius: 8px"]')
+  // market cards render (each card has a View Details button)
+  const cards = page.locator('main button:has-text("View Details")')
   const cardCount = await cards.count()
   record('market cards render', cardCount === marketCount, `cards=${cardCount}`)
 
   // card content matches on-chain data (question text + pools)
-  await page.locator('h3').first().waitFor({ state: 'visible', timeout: 60000 })
-  const question = await page.locator('h3').first().innerText()
+  await cards.first().waitFor({ state: 'visible', timeout: 60000 })
+  const question = await page.locator('main div.font-semibold').first().innerText()
   const bodyText = await page.locator('body').innerText()
-  const hasPools = /YES Pool: \d+\.\d+ \| NO Pool: \d+\.\d+/.test(bodyText)
+  const hasPools = /YES \d+\.\d+/.test(bodyText) && /NO \d+\.\d+/.test(bodyText)
   record('market card shows on-chain question', question.includes('ETH above 1000'), `question=${JSON.stringify(question)}`)
   record('market card shows pool amounts', hasPools)
 
   // 4. Nav tabs render without crashing
   const tabs = [
     ['Markets', 'h2:has-text("Markets (")'],
-    ['Create', 'h2:has-text("Create Market")'],
+    ['Create', 'text=Deploy a new prediction market on World Chain Sepolia.'],
     ['Portfolio', 'h2:has-text("Portfolio")'],
     ['Delegate', 'h2:has-text("Delegate")'],
     ['Governance', 'h2:has-text("Governance")'],
     ['Disputes', 'h2:has-text("HumanHouse")'],
   ]
   for (const [label, selector] of tabs) {
-    const btn = page.locator(`nav button:has-text("${label}")`).first()
+    const btn = page.locator(`[role="tab"]:has-text("${label}")`).first()
     try {
       await btn.click({ timeout: 10000 })
       await page.locator(selector).waitFor({ state: 'visible', timeout: 60000 })
@@ -79,13 +79,13 @@ async function main() {
   }
 
   // 5. Portfolio unconnected state
-  await page.locator('nav button:has-text("Portfolio")').first().click()
+  await page.locator('[role="tab"]:has-text("Portfolio")').first().click()
   await page.locator('text=Connect your wallet to view portfolio.').waitFor({ state: 'visible', timeout: 30000 })
   record('portfolio unconnected state', true)
 
   // 6. Disputes page renders (HumanHouse not deployed yet -> no chain deposit expected)
-  await page.locator('nav button:has-text("Disputes")').first().click()
-  const raiseDisputeVisible = await page.locator('h3:has-text("Raise Dispute")').isVisible().catch(() => false)
+  await page.locator('[role="tab"]:has-text("Disputes")').first().click()
+  const raiseDisputeVisible = await page.locator('text=Raise Dispute').first().isVisible().catch(() => false)
   record('humanhouse page renders', raiseDisputeVisible)
 
   // 7. Console errors (allow known benign warnings, fail on real errors)

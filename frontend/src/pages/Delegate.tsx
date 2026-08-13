@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useAccount } from 'wagmi'
-import { useReadContract, useWriteContract } from 'wagmi'
+import { useAccount, useReadContract, useWriteContract } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
-import {
-  CORN_TOKEN_ADDRESS, cornTokenABI,
-  GOV_CORN_TOKEN_ADDRESS, govCrownTokenABI,
-} from '../contracts/abi'
+import { CORN_TOKEN_ADDRESS, cornTokenABI, GOV_CORN_TOKEN_ADDRESS, govCrownTokenABI } from '../contracts/abi'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function Delegate() {
   const { address } = useAccount()
@@ -14,107 +14,75 @@ export function Delegate() {
   const [delegatee, setDelegatee] = useState('')
 
   const { data: cornBalance, refetch: refetchCorn } = useReadContract({
-    address: CORN_TOKEN_ADDRESS,
-    abi: cornTokenABI,
-    functionName: 'balanceOf',
+    address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
   })
   const { data: govCornBalance, refetch: refetchGov } = useReadContract({
-    address: GOV_CORN_TOKEN_ADDRESS,
-    abi: govCrownTokenABI,
-    functionName: 'balanceOf',
+    address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
   })
   const { data: votes } = useReadContract({
-    address: GOV_CORN_TOKEN_ADDRESS,
-    abi: govCrownTokenABI,
-    functionName: 'getVotes',
+    address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'getVotes',
     args: address ? [address] : undefined,
   })
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: CORN_TOKEN_ADDRESS,
-    abi: cornTokenABI,
-    functionName: 'allowance',
+    address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'allowance',
     args: address ? [address, GOV_CORN_TOKEN_ADDRESS] : undefined,
   })
-
   const { writeContract } = useWriteContract()
 
   const depositAmt = parseEther(depositAmount || '0')
   const needsApprove = allowance !== undefined && depositAmt > 0n && depositAmt > (allowance as bigint)
-
   const refetchAll = () => { refetchCorn(); refetchGov(); refetchAllowance() }
 
   return (
-    <div>
-      <h2>Delegate</h2>
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold">Delegate</h2>
       {!address ? (
-        <p>Connect your wallet to delegate.</p>
+        <Card><CardContent className="p-6 text-muted">Connect your wallet to delegate.</CardContent></Card>
       ) : (
-        <>
-          <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
-            <p>CORN Balance: <strong>{cornBalance ? formatEther(cornBalance as bigint) : '—'}</strong></p>
-            <p>govCORN Balance: <strong>{govCornBalance ? formatEther(govCornBalance as bigint) : '—'}</strong></p>
-            <p>Voting Power: <strong>{votes ? formatEther(votes as bigint) : '—'}</strong></p>
-          </div>
-
-          <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
-            <h3>Deposit CORN → govCORN</h3>
-            <input
-              value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
-              placeholder="Amount" style={{ marginRight: 8 }}
-            />
-            <button
-              disabled={!needsApprove || depositAmt === 0n}
-              onClick={() => writeContract({
-                address: CORN_TOKEN_ADDRESS, abi: cornTokenABI,
-                functionName: 'approve',
-                args: [GOV_CORN_TOKEN_ADDRESS, depositAmt],
-              }, { onSuccess: () => refetchAllowance() })}
-              style={{ marginRight: 8 }}
-            >Approve</button>
-            <button
-              disabled={needsApprove || depositAmt === 0n}
-              onClick={() => writeContract({
-                address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI,
-                functionName: 'depositFor',
-                args: [address, depositAmt],
-              }, { onSuccess: () => refetchAll() })}
-            >Deposit</button>
-          </div>
-
-          <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6, marginBottom: 16 }}>
-            <h3>Withdraw govCORN → CORN</h3>
-            <input
-              value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
-              placeholder="Amount" style={{ marginRight: 8 }}
-            />
-            <button
-              disabled={parseEther(withdrawAmount || '0') === 0n}
-              onClick={() => writeContract({
-                address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI,
-                functionName: 'withdrawTo',
-                args: [address, parseEther(withdrawAmount || '0')],
-              }, { onSuccess: () => refetchAll() })}
-            >Withdraw</button>
-          </div>
-
-          <div style={{ border: '1px solid #ccc', padding: 12, borderRadius: 6 }}>
-            <h3>Delegate Voting Power</h3>
-            <input
-              value={delegatee} onChange={e => setDelegatee(e.target.value)}
-              placeholder="0x..." style={{ marginRight: 8, width: 300 }}
-            />
-            <button
-              disabled={!delegatee}
-              onClick={() => writeContract({
-                address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI,
-                functionName: 'delegate',
-                args: [delegatee as `0x${string}`],
-              })}
-            >Delegate</button>
-          </div>
-        </>
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="grid grid-cols-3 gap-4 p-6">
+              <div><p className="text-xs text-muted">CORN Balance</p><p className="font-medium">{cornBalance ? formatEther(cornBalance as bigint) : '-'}</p></div>
+              <div><p className="text-xs text-muted">govCORN Balance</p><p className="font-medium">{govCornBalance ? formatEther(govCornBalance as bigint) : '-'}</p></div>
+              <div><p className="text-xs text-muted">Voting Power</p><p className="font-medium">{votes ? formatEther(votes as bigint) : '-'}</p></div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Deposit CORN → govCORN</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" disabled={!needsApprove || depositAmt === 0n} onClick={() => writeContract({ address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'approve', args: [GOV_CORN_TOKEN_ADDRESS, depositAmt] }, { onSuccess: () => refetchAllowance() })}>Approve</Button>
+                <Button disabled={needsApprove || depositAmt === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'depositFor', args: [address, depositAmt] }, { onSuccess: () => refetchAll() })}>Deposit</Button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Withdraw govCORN → CORN</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <Button disabled={parseEther(withdrawAmount || '0') === 0n} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'withdrawTo', args: [address, parseEther(withdrawAmount || '0')] }, { onSuccess: () => refetchAll() })}>Withdraw</Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Delegate Voting Power</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>Delegatee Address</Label>
+                <Input value={delegatee} onChange={(e) => setDelegatee(e.target.value)} placeholder="0x..." className="font-mono" />
+              </div>
+              <Button disabled={!delegatee} onClick={() => writeContract({ address: GOV_CORN_TOKEN_ADDRESS, abi: govCrownTokenABI, functionName: 'delegate', args: [delegatee as `0x${string}`] })}>Delegate</Button>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

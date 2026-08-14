@@ -47,6 +47,9 @@ async function main() {
 
   // market cards render (each card has a View Details button)
   const cards = page.locator('main button:has-text("查看详情")')
+  try {
+    await cards.first().waitFor({ state: 'visible', timeout: 60000 })
+  } catch { /* count() below still reports the truth */ }
   const cardCount = await cards.count()
   record('market cards render', cardCount === marketCount, `cards=${cardCount}`)
 
@@ -66,7 +69,7 @@ async function main() {
     await catBtn.click()
     await page.waitForTimeout(500)
     const after = await page.locator('main button:has-text("查看详情")').count()
-    record('category filter bar renders and filters', before > 0 && after <= before, `before=${before} after=${after}`)
+    record('category filter bar renders and filters', after > 0 && after < before, `before=${before} after=${after}`)
     await page.locator('main button:has-text("全部")').first().click()
     await page.waitForTimeout(500)
   } catch (e) {

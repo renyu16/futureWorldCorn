@@ -68,7 +68,7 @@ function MarketCard({ market, onSelect }: { market: MarketData; onSelect: (id: n
   const isResolved = status === 1
 
   return (
-    <Card className="transition-shadow hover:shadow-md">
+    <Card className={`transition-all hover:-translate-y-0.5 hover:shadow-md ${isResolved ? 'opacity-70' : ''}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">{question}</CardTitle>
@@ -88,6 +88,10 @@ function MarketCard({ market, onSelect }: { market: MarketData; onSelect: (id: n
         <div className="flex h-2 overflow-hidden rounded-full bg-muted/15">
           <div className="bg-yes" style={{ width: `${yesPct}%` }} />
           <div className="bg-no" style={{ width: `${100 - yesPct}%` }} />
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted">资金池</span>
+          <span className="font-medium">{totalPool.toFixed(2)} CORN</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-yes font-medium">YES {yesPool.toFixed(2)} CORN</span>

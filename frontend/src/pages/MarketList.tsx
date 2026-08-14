@@ -3,7 +3,9 @@ import { useMarketCount, useMarketTuple } from '../hooks/useMarket'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CATEGORIES, CATEGORY_OTHER, classifyQuestion } from '../lib/categories'
+import type { MarketTuple } from '../hooks/useMarket'
 
 interface Props {
   onSelect: (id: number) => void
@@ -101,6 +103,88 @@ function MarketCard({ market, onSelect }: { market: MarketData; onSelect: (id: n
   )
 }
 
+function TrendingLoader({ id, onData }: { id: number; onData: (id: number, m: MarketTuple) => void }) {
+  const { data: market } = useMarketTuple(id)
+  useEffect(() => {
+    if (market) onData(id, market)
+  }, [market, id, onData])
+  return null
+}
+
+function TrendingCard({ id, market, onSelect }: { id: number; market: MarketTuple; onSelect: (id: number) => void }) {
+  const [q, outcomeYes, outcomeNo, deadline] = market
+  const yesPool = Number(outcomeYes) / 1e18
+  const noPool = Number(outcomeNo) / 1e18
+  const totalPool = yesPool + noPool
+  const yesPct = totalPool > 0 ? (yesPool / totalPool) * 100 : 50
+  const categoryId = classifyQuestion(q)
+  return (
+    <button
+      data-testid="trending-card"
+      onClick={() => onSelect(id)}
+      className="group min-w-[280px] snap-start rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[categoryId] ?? '其他'}</Badge>
+        <span className="text-xs text-muted">{new Date(Number(deadline) * 1000).toLocaleDateString()}</span>
+      </div>
+      <p className="mb-3 line-clamp-2 text-sm font-medium">{q}</p>
+      <div className="flex items-baseline gap-1">
+        <span className="text-4xl font-extrabold text-yes">{yesPct.toFixed(0)}%</span>
+        <span className="text-xs text-muted">YES</span>
+      </div>
+      <div className="mt-2 text-xs text-muted">资金池 {totalPool.toFixed(2)} CORN</div>
+    </button>
+  )
+}
+
+function TrendingMarket({ count, onSelect }: { count: number; onSelect: (id: number) => void }) {
+  const [markets, setMarkets] = useState<Record<number, MarketTuple>>({})
+  const ids = useMemo(() => Array.from({ length: count }, (_, i) => i + 1), [count])
+
+  const onData = useMemo(
+    () => (id: number, m: MarketTuple) => {
+      setMarkets((prev) => {
+        if (prev[id] === m) return prev
+        return { ...prev, [id]: m }
+      })
+    },
+    []
+  )
+
+  const sorted = useMemo(() => {
+    return Object.entries(markets)
+      .map(([id, m]) => ({ id: Number(id), pool: Number(m[1]) / 1e18 + Number(m[2]) / 1e18, status: m[4] }))
+      .filter((x) => x.status === 0 && x.pool > 0)
+      .sort((a, b) => b.pool - a.pool)
+      .slice(0, 5)
+  }, [markets])
+
+  const loading = ids.length > 0 && Object.keys(markets).length < ids.length
+
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-bold">热门市场</h2>
+      {ids.map((id) => (
+        <TrendingLoader key={id} id={id} onData={onData} />
+      ))}
+      {loading ? (
+        <div className="flex gap-4 overflow-x-auto">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-40 min-w-[280px]" />
+          ))}
+        </div>
+      ) : sorted.length > 0 ? (
+        <div className="flex gap-4 overflow-x-auto pb-2 snap-x">
+          {sorted.map(({ id }) => (
+            <TrendingCard key={id} id={id} market={markets[id]} onSelect={onSelect} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export function MarketList({ onSelect }: Props) {
   const [category, setCategory] = useState<string>('all')
   const [status, setStatus] = useState<Record<number, { loaded: boolean; visible: boolean }>>({})
@@ -128,6 +212,7 @@ export function MarketList({ onSelect }: Props) {
 
   return (
     <div className="space-y-4">
+      <TrendingMarket count={total} onSelect={onSelect} />
       <h2 className="text-xl font-bold">市场（{total}）</h2>
       <div className="flex flex-wrap gap-2">
         <Button key="all" variant={category === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setCategory('all')}>

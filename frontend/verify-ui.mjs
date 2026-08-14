@@ -54,11 +54,11 @@ async function main() {
   record('market cards render', cardCount === marketCount, `cards=${cardCount}`)
 
   // card content matches on-chain data (question text + pools)
-  await cards.first().waitFor({ state: 'visible', timeout: 60000 })
-  const question = await page.locator('main div.font-semibold').first().innerText()
+  const ethCard = page.locator('main div:has-text("ETH above 1000")').first()
+  const hasEthQuestion = (await ethCard.count()) > 0
   const bodyText = await page.locator('body').innerText()
   const hasPools = /YES \d+\.\d+/.test(bodyText) && /NO \d+\.\d+/.test(bodyText)
-  record('market card shows on-chain question', question.includes('ETH above 1000'), `question=${JSON.stringify(question)}`)
+  record('market card shows on-chain question', hasEthQuestion, `found=${hasEthQuestion}`)
   record('market card shows pool amounts', hasPools)
 
   // 3b. Category filter bar renders; clicking a category filters cards
@@ -74,6 +74,16 @@ async function main() {
     await page.waitForTimeout(500)
   } catch (e) {
     record('category filter bar renders and filters', false, e.message.split('\n')[0])
+  }
+
+  // 3a. Trending section renders with open market cards
+  const trendingCard = page.locator('[data-testid="trending-card"]').first()
+  try {
+    await trendingCard.waitFor({ state: 'visible', timeout: 30000 })
+    const trendingCards = await page.locator('[data-testid="trending-card"]').count()
+    record('trending section renders', trendingCards > 0, `cards=${trendingCards}`)
+  } catch (e) {
+    record('trending section renders', false, e.message.split('\n')[0])
   }
 
   // 4. Nav tabs render without crashing

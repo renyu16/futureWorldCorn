@@ -26,6 +26,12 @@ export function MarketDetail({ marketId, onBack }: Props) {
     abi: predictionMarketABI,
     functionName: 'owner',
   })
+  const { data: isResolver } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'resolvers',
+    args: address ? [address] : undefined,
+  })
   const { writeContract: approve } = useWriteApprove()
   const { writeContract: bet } = useWriteBet()
   const { writeContract: claim } = useWriteClaimReward()
@@ -34,11 +40,11 @@ export function MarketDetail({ marketId, onBack }: Props) {
   const [betAmount, setBetAmount] = useState('')
   const [selectedOutcome, setSelectedOutcome] = useState<number>(0)
 
-  if (isLoading) return <p className="text-muted">Loading market...</p>
-  if (!market) return <p className="text-muted">Market not found</p>
+  if (isLoading) return <p className="text-muted">加载市场中...</p>
+  if (!market) return <p className="text-muted">未找到市场</p>
 
   const [question, outcomeYes, outcomeNo, deadline, status, result] = market
-  const statusLabel = ['Open', 'Resolved', 'Cancelled'][status as number] ?? 'Unknown'
+  const statusLabel = ['进行中', '已结算', '已取消'][status as number] ?? '未知'
   const yesPool = Number(outcomeYes) / 1e18
   const noPool = Number(outcomeNo) / 1e18
   const userBalance = balance ? Number(balance) / 1e18 : 0
@@ -47,6 +53,7 @@ export function MarketDetail({ marketId, onBack }: Props) {
   const isResolved = status === 1
   const amountParsed = BigInt(Math.floor(parseFloat(betAmount || '0') * 1e18))
   const isOwner = address && owner ? address.toLowerCase() === (owner as string).toLowerCase() : false
+  const canResolve = isOwner || (isResolver as boolean) === true
   const deadlinePassed = Number(deadline) * 1000 < Date.now()
 
   const handleBet = async () => {
@@ -81,7 +88,7 @@ export function MarketDetail({ marketId, onBack }: Props) {
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={onBack} className="text-muted">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        <ArrowLeft className="mr-2 h-4 w-4" /> 返回
       </Button>
       <Card>
         <CardHeader>
@@ -92,20 +99,20 @@ export function MarketDetail({ marketId, onBack }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="text-muted">Deadline:</span><br />{new Date(Number(deadline) * 1000).toLocaleString()}</div>
-            <div><span className="text-muted">Result:</span><br />{isResolved ? (result ? 'YES Won' : 'NO Won') : '-'}</div>
-            <div><span className="text-yes font-medium">YES Pool:</span><br />{yesPool.toFixed(4)} CORN</div>
-            <div><span className="text-no font-medium">NO Pool:</span><br />{noPool.toFixed(4)} CORN</div>
+            <div><span className="text-muted">截止时间：</span><br />{new Date(Number(deadline) * 1000).toLocaleString()}</div>
+            <div><span className="text-muted">结果：</span><br />{isResolved ? (result ? 'YES 胜' : 'NO 胜') : '-'}</div>
+            <div><span className="text-yes font-medium">YES 资金池：</span><br />{yesPool.toFixed(4)} CORN</div>
+            <div><span className="text-no font-medium">NO 资金池：</span><br />{noPool.toFixed(4)} CORN</div>
           </div>
           <div className="rounded-lg bg-muted/10 p-3 text-sm">
-            <span className="text-muted">Your Balance:</span> <span className="font-medium">{userBalance.toFixed(4)} CORN</span>
+            <span className="text-muted">您的余额：</span> <span className="font-medium">{userBalance.toFixed(4)} CORN</span>
           </div>
 
           {isOpen && address && !deadlinePassed && (
             <div className="space-y-3 border-t border-border pt-4">
-              <h3 className="font-semibold">Place Bet</h3>
+              <h3 className="font-semibold">下注</h3>
               <div className="space-y-2">
-                <Label>Outcome</Label>
+                <Label>选项</Label>
                 <Select value={String(selectedOutcome)} onValueChange={(v) => setSelectedOutcome(Number(v))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -115,28 +122,28 @@ export function MarketDetail({ marketId, onBack }: Props) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Amount (CORN)</Label>
+                <Label>数量（CORN）</Label>
                 <Input type="number" placeholder="0.00" min="0" step="0.01" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} />
               </div>
               <Button className="w-full" disabled={!betAmount || parseFloat(betAmount) <= 0} onClick={handleBet}>
-                {userAllowance < parseFloat(betAmount || '0') ? 'Approve' : 'Bet'}
+                {userAllowance < parseFloat(betAmount || '0') ? '授权' : '下注'}
               </Button>
             </div>
           )}
 
           {isResolved && address && (
             <div className="border-t border-border pt-4">
-              <Button className="w-full" onClick={handleClaim}>Claim Reward</Button>
+              <Button className="w-full" onClick={handleClaim}>领取奖励</Button>
             </div>
           )}
 
-          {isOpen && isOwner && deadlinePassed && (
+          {isOpen && canResolve && deadlinePassed && (
             <div className="space-y-3 border-t border-border pt-4">
-              <h3 className="font-semibold">Resolve Market</h3>
-              <p className="text-sm text-muted">Deadline has passed. Choose the winning outcome.</p>
+              <h3 className="font-semibold">结算市场</h3>
+              <p className="text-sm text-muted">截止时间已过，请选择获胜结果。</p>
               <div className="flex gap-2">
-                <Button className="flex-1" variant="outline" onClick={() => handleResolve(true)}>Resolve YES Wins</Button>
-                <Button className="flex-1" variant="outline" onClick={() => handleResolve(false)}>Resolve NO Wins</Button>
+                <Button className="flex-1" variant="outline" onClick={() => handleResolve(true)}>结算为 YES 胜</Button>
+                <Button className="flex-1" variant="outline" onClick={() => handleResolve(false)}>结算为 NO 胜</Button>
               </div>
             </div>
           )}

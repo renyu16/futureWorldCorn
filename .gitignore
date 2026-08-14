@@ -12,3 +12,5 @@ foundry_*_win32_amd64.zip
 frontend/dist/
 frontend/node_modules/
 frontend/package-lock.json
+
+broadcast/

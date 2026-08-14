@@ -17,8 +17,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft } from 'lucide-react'
 
-const DISPUTE_TYPE: Record<number, string> = { 0: 'Oracle Result', 1: 'Market Content' }
-const DISPUTE_STATE: Record<number, string> = { 0: 'Active', 1: 'Approved', 2: 'Rejected' }
+const DISPUTE_TYPE: Record<number, string> = { 0: '预言机结果', 1: '市场内容' }
+const DISPUTE_STATE: Record<number, string> = { 0: '进行中', 1: '已通过', 2: '已驳回' }
 const STATE_VARIANT: Record<number, 'default' | 'secondary' | 'success' | 'destructive'> = {
   0: 'default',
   1: 'success',
@@ -42,7 +42,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   const { writeContract: writeVote } = useVote()
   const { writeContract: writeExecute } = useExecuteDispute()
 
-  if (!dispute) return <p className="text-muted">Loading dispute #{id.toString()}...</p>
+  if (!dispute) return <p className="text-muted">加载争议 #{id.toString()}...</p>
 
   const [marketId, disputeType, state, initiator, deposit, deadline, reason, votesFor, votesAgainst] = dispute as any
   const isActive = Number(state) === 0
@@ -56,29 +56,29 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-xl">Dispute #{id.toString()}</CardTitle>
-            <Badge variant={STATE_VARIANT[Number(state)] || 'secondary'}>{DISPUTE_STATE[Number(state)] || 'Unknown'}</Badge>
+            <CardTitle className="text-xl">争议 #{id.toString()}</CardTitle>
+            <Badge variant={STATE_VARIANT[Number(state)] || 'secondary'}>{DISPUTE_STATE[Number(state)] || '未知'}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-            <div><span className="text-muted">Market ID:</span><br />{marketId.toString()}</div>
-            <div><span className="text-muted">Type:</span><br />{DISPUTE_TYPE[disputeType] || 'Unknown'}</div>
-            <div><span className="text-muted">Initiator:</span><br /><code className="break-all font-mono">{initiator}</code></div>
-            <div><span className="text-muted">Deposit:</span><br />{formatEther(deposit)} CORN</div>
-            <div><span className="text-muted">Deadline:</span><br />{new Date(Number(deadline) * 1000).toLocaleString()}</div>
+            <div><span className="text-muted">市场 ID：</span><br />{marketId.toString()}</div>
+            <div><span className="text-muted">类型：</span><br />{DISPUTE_TYPE[disputeType] || '未知'}</div>
+            <div><span className="text-muted">发起人：</span><br /><code className="break-all font-mono">{initiator}</code></div>
+            <div><span className="text-muted">保证金：</span><br />{formatEther(deposit)} CORN</div>
+            <div><span className="text-muted">截止时间：</span><br />{new Date(Number(deadline) * 1000).toLocaleString()}</div>
           </div>
-          <div className="text-sm"><span className="text-muted">Reason:</span><br />{reason}</div>
+          <div className="text-sm"><span className="text-muted">原因：</span><br />{reason}</div>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="text-yes font-medium">For:</span><br />{formatEther(votesFor)}</div>
-            <div><span className="text-no font-medium">Against:</span><br />{formatEther(votesAgainst)}</div>
+            <div><span className="text-yes font-medium">赞成：</span><br />{formatEther(votesFor)}</div>
+            <div><span className="text-no font-medium">反对：</span><br />{formatEther(votesAgainst)}</div>
           </div>
 
           {isActive && !isExpired && address && (
             <div className="space-y-3 border-t border-border pt-4">
               <div className="space-y-1">
-                <p className="font-medium">World ID Verification (Mock)</p>
-                <p className="text-xs text-muted">Currently using mock proof. Real World ID integration coming soon.</p>
+                <p className="font-medium">World ID 验证（模拟）</p>
+                <p className="text-xs text-muted">当前使用模拟证明，真正的 World ID 集成即将上线。</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -91,7 +91,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                     args: [id, true, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
                   })}
                 >
-                  Vote For
+                  投赞成票
                 </Button>
                 <Button
                   variant="outline"
@@ -103,7 +103,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                     args: [id, false, MOCK_ROOT, MOCK_NULLIFIER_HASH, MOCK_PROOF],
                   })}
                 >
-                  Vote Against
+                  投反对票
                 </Button>
               </div>
             </div>
@@ -121,7 +121,7 @@ function DisputeDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                   args: [id],
                 })}
               >
-                Execute Dispute
+                执行争议裁决
               </Button>
             </div>
           )}
@@ -154,29 +154,29 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Raise Dispute</CardTitle>
-        {deposit > 0n && <CardDescription>Required deposit: {formatEther(deposit)} CORN</CardDescription>}
+        <CardTitle className="text-lg">发起争议</CardTitle>
+        {deposit > 0n && <CardDescription>所需保证金： {formatEther(deposit)} CORN</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
-          <Label>Market ID</Label>
+          <Label>市场 ID</Label>
           <Input value={marketId} onChange={e => setMarketId(e.target.value)} placeholder="Market ID" />
         </div>
         <div className="space-y-2">
-          <Label>Type</Label>
+          <Label>类型</Label>
           <Select value={disputeType} onValueChange={setDisputeType}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="0">Oracle Result</SelectItem>
-              <SelectItem value="1">Market Content</SelectItem>
+              <SelectItem value="0">预言机结果</SelectItem>
+              <SelectItem value="1">市场内容</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Reason</Label>
-          <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Why this result is wrong" />
+          <Label>原因</Label>
+          <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="该结果为何有误" />
         </div>
         <div className="flex flex-wrap gap-2 pt-2">
           {needsApprove && (
@@ -189,7 +189,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
                 args: [HUMAN_HOUSE_ADDRESS, deposit],
               }, { onSuccess: () => refetchAllowance() })}
             >
-              Approve CORN
+              授权 CORN
             </Button>
           )}
           <Button
@@ -201,7 +201,7 @@ function RaiseDispute({ onCreated }: { onCreated: () => void }) {
               args: [BigInt(marketId), Number(disputeType), reason],
             }, { onSuccess: () => { setMarketId(''); setReason(''); onCreated() } })}
           >
-            Raise Dispute
+            发起争议
           </Button>
         </div>
       </CardContent>
@@ -223,13 +223,13 @@ function DisputeRow({ dispute: d, onSelect }: { dispute: DisputeInfo; onSelect: 
             <Badge variant={STATE_VARIANT[Number(state)] || 'secondary'}>{DISPUTE_STATE[Number(state)] || '—'}</Badge>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-            <span>Market: {d.marketId.toString()}</span>
+            <span>市场： {d.marketId.toString()}</span>
             <span>{DISPUTE_TYPE[d.disputeType]}</span>
-            <span>Deadline: {deadline ? new Date(Number(deadline) * 1000).toLocaleDateString() : '—'}</span>
+            <span>截止时间： {deadline ? new Date(Number(deadline) * 1000).toLocaleDateString() : '—'}</span>
             <span className="truncate">{d.reason.length > 40 ? d.reason.slice(0, 40) + '...' : d.reason}</span>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={onSelect}>View</Button>
+        <Button variant="outline" size="sm" onClick={onSelect}>查看</Button>
       </CardContent>
     </Card>
   )
@@ -257,7 +257,7 @@ export function HumanHouse() {
       setLoading(false)
     }).catch((e) => {
       console.error('Failed to fetch disputes:', e)
-      setError('Failed to load disputes')
+      setError('争议加载失败')
       setLoading(false)
     })
   }, [publicClient])
@@ -268,9 +268,9 @@ export function HumanHouse() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">HumanHouse Disputes</h2>
+      <h2 className="text-xl font-bold">HumanHouse 争议</h2>
       <RaiseDispute onCreated={() => setLoading(true)} />
-      {!address ? <p className="text-muted">Connect your wallet to view disputes.</p> : loading ? <p className="text-muted">Loading disputes...</p> : error ? <p className="text-no">{error}</p> : disputes.length === 0 ? <p className="text-muted">No disputes yet.</p> : (
+      {!address ? <p className="text-muted">连接钱包以查看争议。</p> : loading ? <p className="text-muted">加载争议s...</p> : error ? <p className="text-no">{error}</p> : disputes.length === 0 ? <p className="text-muted">暂无争议。</p> : (
         <div className="space-y-3">
           {disputes.map(d => (
             <DisputeRow key={d.id.toString()} dispute={d} onSelect={() => setSelectedId(d.id)} />

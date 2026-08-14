@@ -8,13 +8,13 @@ function MarketPosition({ marketId }: { marketId: number }) {
   const { data: market } = useMarketTuple(marketId)
   if (!market) return null
   const [question, , , , status] = market
-  const statusLabel = ['Open', 'Resolved', 'Cancelled'][status as number] ?? 'Unknown'
+  const statusLabel = ['进行中', '已结算', '已取消'][status as number] ?? '未知'
   return (
     <Card>
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <p className="font-medium">{question}</p>
-          <p className="text-xs text-muted">Market #{marketId}</p>
+          <p className="text-xs text-muted">市场 #{marketId}</p>
         </div>
         <Badge variant={status === 0 ? 'default' : status === 1 ? 'success' : 'secondary'}>{statusLabel}</Badge>
       </CardContent>
@@ -31,22 +31,22 @@ export function Portfolio() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Portfolio</h2>
+      <h2 className="text-xl font-bold">投资组合</h2>
       {address ? (
         <div className="space-y-6">
           <Card>
             <CardContent className="space-y-2 p-6">
-              <div className="flex justify-between"><span className="text-muted">Wallet</span><span className="font-mono text-sm">{address}</span></div>
-              <div className="flex justify-between"><span className="text-muted">CORN Balance</span><span className="font-medium">{balance ? (Number(balance) / 1e18).toFixed(4) : '0'} CORN</span></div>
+              <div className="flex justify-between"><span className="text-muted">钱包</span><span className="font-mono text-sm">{address}</span></div>
+              <div className="flex justify-between"><span className="text-muted">CORN 余额</span><span className="font-medium">{balance ? (Number(balance) / 1e18).toFixed(4) : '0'} CORN</span></div>
             </CardContent>
           </Card>
           <div className="space-y-3">
-            <h3 className="font-semibold">Your Markets</h3>
-            {total === 0 ? <p className="text-muted">No markets found.</p> : ids.map((id) => <MarketPosition key={id} marketId={id} />)}
+            <h3 className="font-semibold">您的市场</h3>
+            {total === 0 ? <p className="text-muted">暂无市场。</p> : ids.map((id) => <MarketPosition key={id} marketId={id} />)}
           </div>
         </div>
       ) : (
-        <Card><CardContent className="p-6 text-muted">Connect your wallet to view portfolio.</CardContent></Card>
+        <Card><CardContent className="p-6 text-muted">连接钱包以查看投资组合。</CardContent></Card>
       )}
     </div>
   )

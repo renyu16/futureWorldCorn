@@ -22,7 +22,7 @@ const worldChain = defineChain({
 })
 
 const config = getDefaultConfig({
-  appName: 'Prediction Master',
+  appName: '预测大师',
   projectId: '38cfd0c495d4727d3d7e51ec3824a052',
   chains: [worldChain],
   transports: {

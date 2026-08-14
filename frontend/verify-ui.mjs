@@ -24,7 +24,7 @@ async function main() {
   record('page loads', title.length > 0, `title=${JSON.stringify(title)}`)
 
   const h1 = await page.locator('h1').textContent()
-  record('app header renders', h1 === 'Prediction Master', `h1=${JSON.stringify(h1)}`)
+  record('app header renders', h1 === '预测大师', `h1=${JSON.stringify(h1)}`)
 
   // 2. Connect button exists (RainbowKit, localized)
   await page.waitForSelector('header button', { timeout: 30000 })
@@ -34,19 +34,19 @@ async function main() {
   record('connect wallet button visible', hasConnect, `text=${JSON.stringify(connectText)}`)
 
   // 3. Market list reads live chain data via public RPC
-  const marketsHeading = page.locator('h2:has-text("Markets (")')
+  const marketsHeading = page.locator('h2:has-text("市场（")')
   let marketCount = 0
   try {
     await marketsHeading.waitFor({ state: 'visible', timeout: 60000 })
     const headingText = await marketsHeading.textContent()
-    marketCount = Number((headingText.match(/\((\d+)\)/) || [])[1] || 0)
+    marketCount = Number((headingText.match(/（(\d+)）/) || [])[1] || 0)
     record('market list reads chain (marketCount>0)', marketCount > 0, `count=${marketCount}`)
   } catch (e) {
     record('market list reads chain (marketCount>0)', false, e.message.split('\n')[0])
   }
 
   // market cards render (each card has a View Details button)
-  const cards = page.locator('main button:has-text("View Details")')
+  const cards = page.locator('main button:has-text("查看详情")')
   const cardCount = await cards.count()
   record('market cards render', cardCount === marketCount, `cards=${cardCount}`)
 
@@ -58,14 +58,28 @@ async function main() {
   record('market card shows on-chain question', question.includes('ETH above 1000'), `question=${JSON.stringify(question)}`)
   record('market card shows pool amounts', hasPools)
 
+  // 3b. Category filter bar renders; clicking a category filters cards
+  const catBtn = page.locator('main button:has-text("加密")').first()
+  try {
+    await catBtn.waitFor({ state: 'visible', timeout: 30000 })
+    const before = await page.locator('main button:has-text("查看详情")').count()
+    await catBtn.click()
+    await page.waitForTimeout(500)
+    const after = await page.locator('main button:has-text("查看详情")').count()
+    record('category filter bar renders and filters', before > 0 && after <= before, `before=${before} after=${after}`)
+    await page.locator('main button:has-text("全部")').first().click()
+    await page.waitForTimeout(500)
+  } catch (e) {
+    record('category filter bar renders and filters', false, e.message.split('\n')[0])
+  }
+
   // 4. Nav tabs render without crashing
   const tabs = [
-    ['Markets', 'h2:has-text("Markets (")'],
-    ['Create', 'text=Deploy a new prediction market on World Chain Sepolia.'],
-    ['Portfolio', 'h2:has-text("Portfolio")'],
-    ['Delegate', 'h2:has-text("Delegate")'],
-    ['Governance', 'h2:has-text("Governance")'],
-    ['Disputes', 'h2:has-text("HumanHouse")'],
+    ['市场', 'h2:has-text("市场（")'],
+    ['投资组合', 'h2:has-text("投资组合")'],
+    ['委托', 'h2:has-text("委托")'],
+    ['治理', 'h2:has-text("治理")'],
+    ['争议', 'h2:has-text("HumanHouse")'],
   ]
   for (const [label, selector] of tabs) {
     const btn = page.locator(`[role="tab"]:has-text("${label}")`).first()
@@ -78,14 +92,18 @@ async function main() {
     }
   }
 
+  // 4b. Role gating: unconnected (non-owner) users must NOT see the Create tab
+  const createTabCount = await page.locator('[role="tab"]:has-text("创建")').count()
+  record('create tab hidden for non-owner', createTabCount === 0, `createTabs=${createTabCount}`)
+
   // 5. Portfolio unconnected state
-  await page.locator('[role="tab"]:has-text("Portfolio")').first().click()
-  await page.locator('text=Connect your wallet to view portfolio.').waitFor({ state: 'visible', timeout: 30000 })
+  await page.locator('[role="tab"]:has-text("投资组合")').first().click()
+  await page.locator('text=连接钱包以查看投资组合。').waitFor({ state: 'visible', timeout: 30000 })
   record('portfolio unconnected state', true)
 
   // 6. Disputes page renders (HumanHouse not deployed yet -> no chain deposit expected)
-  await page.locator('[role="tab"]:has-text("Disputes")').first().click()
-  const raiseDisputeVisible = await page.locator('text=Raise Dispute').first().isVisible().catch(() => false)
+  await page.locator('[role="tab"]:has-text("争议")').first().click()
+  const raiseDisputeVisible = await page.locator('text=发起争议').first().isVisible().catch(() => false)
   record('humanhouse page renders', raiseDisputeVisible)
 
   // 7. Console errors (allow known benign warnings, fail on real errors)
@@ -93,6 +111,8 @@ async function main() {
     'favicon',
     'ResizeObserver',
     'WebSocket connection',
+    'ERR_CONNECTION_RESET',
+    'pulse.walletconnect.org',
   ]
   const realErrors = consoleErrors.filter((e) => !benign.some((b) => e.includes(b)))
   record('no console/page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))

@@ -19,14 +19,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ArrowLeft } from 'lucide-react'
 
 const STATE_LABEL: Record<string, string> = {
-  Pending: 'Pending', Active: 'Active', Canceled: 'Canceled', Defeated: 'Defeated',
-  Succeeded: 'Succeeded', Queued: 'Queued', Expired: 'Expired', Executed: 'Executed',
+  Pending: '待定', Active: '进行中', Canceled: '已取消', Defeated: '未通过',
+  Succeeded: '已通过', Queued: '已排队', Expired: '已过期', Executed: '已执行',
 }
 
 const STATE_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'destructive'> = {
   Pending: 'secondary', Active: 'default', Succeeded: 'success',
   Queued: 'success', Executed: 'success', Defeated: 'destructive',
-  Canceled: 'secondary', Expired: 'secondary',
+  取消ed: 'secondary', Expired: 'secondary',
 }
 
 function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
@@ -52,31 +52,31 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={onBack} className="text-muted">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        <ArrowLeft className="mr-2 h-4 w-4" /> 返回
       </Button>
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-xl">Proposal #{id.toString()}</CardTitle>
+            <CardTitle className="text-xl">提案 #{id.toString()}</CardTitle>
             <Badge variant={STATE_VARIANT[state as string || ''] || 'secondary'}>{state as string || '—'}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-            <div><span className="text-muted">Proposer:</span><br /><code className="break-all font-mono">{proposer as string || '—'}</code></div>
-            <div><span className="text-muted">Snapshot Block:</span><br />{snapshot?.toString() || '—'}</div>
-            <div><span className="text-muted">Deadline Block:</span><br />{deadline?.toString() || '—'}</div>
+            <div><span className="text-muted">提案人：</span><br /><code className="break-all font-mono">{proposer as string || '—'}</code></div>
+            <div><span className="text-muted">快照区块：</span><br />{snapshot?.toString() || '—'}</div>
+            <div><span className="text-muted">截止区块：</span><br />{deadline?.toString() || '—'}</div>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
-            <div><span className="text-yes font-medium">For:</span><br />{forVotes !== undefined ? formatEther(forVotes) : '—'} govCORN</div>
-            <div><span className="text-no font-medium">Against:</span><br />{against !== undefined ? formatEther(against) : '—'} govCORN</div>
-            <div><span className="text-muted font-medium">Abstain:</span><br />{abstain !== undefined ? formatEther(abstain) : '—'} govCORN</div>
+            <div><span className="text-yes font-medium">赞成：</span><br />{forVotes !== undefined ? formatEther(forVotes) : '—'} govCORN</div>
+            <div><span className="text-no font-medium">反对：</span><br />{against !== undefined ? formatEther(against) : '—'} govCORN</div>
+            <div><span className="text-muted font-medium">弃权：</span><br />{abstain !== undefined ? formatEther(abstain) : '—'} govCORN</div>
           </div>
 
           {state === 'Active' && address && (
             <div className="space-y-3 border-t border-border pt-4">
               <p className="text-sm text-muted">
-                Your Voting Power: <span className="font-medium text-foreground">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span>
+                您的投票权： <span className="font-medium text-foreground">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span>
               </p>
               {userVotes !== undefined && (userVotes as bigint) > 0n && (
                 <div className="flex flex-wrap gap-2">
@@ -88,7 +88,7 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                       functionName: 'castVote',
                       args: [id, 1],
                     })}
-                  >For</Button>
+                  >赞成</Button>
                   <Button
                     variant="outline"
                     className="border-transparent bg-no text-white hover:bg-no/90"
@@ -97,7 +97,7 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                       functionName: 'castVote',
                       args: [id, 0],
                     })}
-                  >Against</Button>
+                  >反对</Button>
                   <Button
                     variant="outline"
                     className="border-transparent bg-muted text-white hover:bg-muted/90"
@@ -106,7 +106,7 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                       functionName: 'castVote',
                       args: [id, 2],
                     })}
-                  >Abstain</Button>
+                  >弃权</Button>
                 </div>
               )}
             </div>
@@ -123,7 +123,7 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
   const [value, setValue] = useState('0')
   const [funcSig, setFuncSig] = useState('')
   const [argsJson, setArgsJson] = useState('[]')
-  const [description, setDescription] = useState('')
+  const [description, set描述] = useState('')
   const [error, setError] = useState<string | null>(null)
   const { writeContract } = usePropose()
 
@@ -159,7 +159,7 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
           description,
         ],
       }, {
-        onSuccess: () => { setTarget(''); setValue('0'); setFuncSig(''); setArgsJson('[]'); setDescription(''); onCreated() },
+        onSuccess: () => { setTarget(''); setValue('0'); setFuncSig(''); setArgsJson('[]'); set描述(''); onCreated() },
       })
     } catch (e: any) {
       setError(e.message || 'Failed to build calldata')
@@ -169,41 +169,41 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1 rounded-lg bg-muted/10 p-3 text-sm">
-        <p>Voting Power: <span className="font-medium">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span></p>
-        <p>Required: <span className="font-medium">{threshold ? formatEther(threshold as bigint) : '-'} govCORN</span> <span className="text-muted">(1% of supply)</span></p>
+        <p>投票权： <span className="font-medium">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span></p>
+        <p>所需门槛： <span className="font-medium">{threshold ? formatEther(threshold as bigint) : '-'} govCORN</span> <span className="text-muted">（总供应量的 1%）</span></p>
       </div>
       {!canPropose && threshold !== undefined && (
-        <p className="text-sm text-no">Insufficient voting power to propose. Delegate or acquire more govCORN.</p>
+        <p className="text-sm text-no">投票权不足，无法发起提案。请委托或获取更多 govCORN。</p>
       )}
       <div className="space-y-2">
-        <Label>Target address</Label>
+        <Label>目标地址</Label>
         <Input value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." className="font-mono" />
       </div>
       <div className="space-y-2">
-        <Label>ETH value (wei)</Label>
+        <Label>ETH 数值（wei）</Label>
         <Input value={value} onChange={e => setValue(e.target.value)} placeholder="0" />
       </div>
       <div className="space-y-2">
-        <Label>Function signature (optional)</Label>
+        <Label>函数签名（可选）</Label>
         <Input value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" />
       </div>
       {funcSig && (
         <div className="space-y-2">
-          <Label>Arguments (JSON array)</Label>
+          <Label>参数（JSON 数组）</Label>
           <Input value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' className="font-mono" />
         </div>
       )}
       <div className="space-y-2">
-        <Label>Description</Label>
+        <Label>描述</Label>
         <textarea
           value={description}
-          onChange={e => setDescription(e.target.value)}
+          onChange={e => set描述(e.target.value)}
           rows={3}
           className="flex min-h-[80px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
       </div>
       {error && <p className="text-sm text-no">{error}</p>}
-      <Button className="w-full" disabled={!canPropose || !validAddress || !description} onClick={handleSubmit}>Submit Proposal</Button>
+      <Button className="w-full" disabled={!canPropose || !validAddress || !description} onClick={handleSubmit}>提交提案</Button>
     </div>
   )
 }
@@ -262,23 +262,23 @@ export function Governance() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Governance</h2>
+        <h2 className="text-xl font-bold">治理</h2>
         {address && (
           <Button variant={showForm ? 'outline' : 'default'} onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Cancel' : 'Create Proposal'}
+            {showForm ? '取消' : '创建提案'}
           </Button>
         )}
       </div>
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Proposal</DialogTitle>
-            <DialogDescription>Submit an on-chain governance proposal. Requires govCORN voting power above the threshold.</DialogDescription>
+            <DialogTitle>创建提案</DialogTitle>
+            <DialogDescription>提交链上治理提案。需要 govCORN 投票权达到门槛以上。</DialogDescription>
           </DialogHeader>
           <CreateProposal onCreated={() => { setShowForm(false); setLoading(true) }} />
         </DialogContent>
       </Dialog>
-      {loading ? <p className="text-muted">Loading proposals...</p> : proposals.length === 0 ? <p className="text-muted">No proposals yet.</p> : (
+      {loading ? <p className="text-muted">加载提案中...</p> : proposals.length === 0 ? <p className="text-muted">暂无提案。</p> : (
         <div className="space-y-3">
           {proposals.map(p => (
             <ProposalRow key={p.id.toString()} proposal={p} onSelect={() => setSelectedId(p.id)} />
@@ -302,7 +302,7 @@ function ProposalRow({ proposal: p, onSelect }: { proposal: { id: bigint; descri
           </div>
           <p className="mt-1 truncate text-sm text-muted">{desc}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={onSelect}>View</Button>
+        <Button variant="outline" size="sm" onClick={onSelect}>查看</Button>
       </CardContent>
     </Card>
   )

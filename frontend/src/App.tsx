@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAccount, useReadContract } from 'wagmi'
 import { WalletConnect } from './components/WalletConnect'
 import { MarketList } from './pages/MarketList'
 import { MarketDetail } from './pages/MarketDetail'
@@ -9,18 +10,26 @@ import { Governance } from './pages/Governance'
 import { HumanHouse } from './pages/HumanHouse'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TrendingUp } from 'lucide-react'
+import { PREDICTION_MARKET_ADDRESS, predictionMarketABI } from './contracts/abi'
 
 function App() {
   const [page, setPage] = useState('list')
   const [selectedMarket, setSelectedMarket] = useState<number | null>(null)
+  const { address } = useAccount()
+  const { data: owner } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'owner',
+  })
+  const isOwner = address && owner ? address.toLowerCase() === (owner as string).toLowerCase() : false
 
   const navItems = [
-    { id: 'list', label: 'Markets' },
-    { id: 'create', label: 'Create' },
-    { id: 'portfolio', label: 'Portfolio' },
-    { id: 'delegate', label: 'Delegate' },
-    { id: 'governance', label: 'Governance' },
-    { id: 'humanhouse', label: 'Disputes' },
+    { id: 'list', label: '市场' },
+    ...(isOwner ? [{ id: 'create', label: '创建' }] : []),
+    { id: 'portfolio', label: '投资组合' },
+    { id: 'delegate', label: '委托' },
+    { id: 'governance', label: '治理' },
+    { id: 'humanhouse', label: '争议' },
   ]
 
   return (
@@ -29,7 +38,7 @@ function App() {
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:gap-6">
           <div className="hidden items-center gap-2 sm:flex">
             <TrendingUp className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-bold">Prediction Master</h1>
+            <h1 className="text-lg font-bold">预测大师</h1>
           </div>
           <Tabs value={page} onValueChange={setPage} className="min-w-0 flex-1">
             <TabsList className="w-full justify-start overflow-x-auto">

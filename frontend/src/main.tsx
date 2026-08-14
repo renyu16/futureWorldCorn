@@ -7,6 +7,7 @@ import { defineChain } from 'viem'
 import '@rainbow-me/rainbowkit/styles.css'
 import './globals.css'
 import App from './App'
+import { setupDeepLink } from './capacitor'
 
 const worldChain = defineChain({
   id: 4801,
@@ -31,6 +32,8 @@ const config = getDefaultConfig({
 })
 
 const queryClient = new QueryClient()
+
+setupDeepLink()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

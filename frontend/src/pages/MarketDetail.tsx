@@ -1,14 +1,11 @@
-import { useState } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { useMarketTuple, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
 import { useTokenBalance, useTokenAllowance, useWriteApprove } from '../hooks/useToken'
 import { CORN_TOKEN_ADDRESS, cornTokenABI, PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { TradingPanel } from '@/components/TradingPanel'
 import { ArrowLeft } from 'lucide-react'
 
 interface Props {
@@ -37,13 +34,10 @@ export function MarketDetail({ marketId, onBack }: Props) {
   const { writeContract: claim } = useWriteClaimReward()
   const { writeContract: resolve } = useWriteResolveMarket()
 
-  const [betAmount, setBetAmount] = useState('')
-  const [selectedOutcome, setSelectedOutcome] = useState<number>(0)
-
   if (isLoading) return <p className="text-muted">加载市场中...</p>
   if (!market) return <p className="text-muted">未找到市场</p>
 
-  const [question, outcomeYes, outcomeNo, deadline, status, result] = market
+  const [question, outcomeYes, outcomeNo, deadline, status, result, feeBps] = market
   const statusLabel = ['进行中', '已结算', '已取消'][status as number] ?? '未知'
   const yesPool = Number(outcomeYes) / 1e18
   const noPool = Number(outcomeNo) / 1e18
@@ -51,24 +45,34 @@ export function MarketDetail({ marketId, onBack }: Props) {
   const userAllowance = allowance ? Number(allowance) / 1e18 : 0
   const isOpen = status === 0
   const isResolved = status === 1
-  const amountParsed = BigInt(Math.floor(parseFloat(betAmount || '0') * 1e18))
   const isOwner = address && owner ? address.toLowerCase() === (owner as string).toLowerCase() : false
   const canResolve = isOwner || (isResolver as boolean) === true
   const deadlinePassed = Number(deadline) * 1000 < Date.now()
 
-  const handleBet = async () => {
-    if (!address || amountParsed <= 0n) return
-    if (userAllowance < parseFloat(betAmount || '0')) {
+  const handleBet = async (outcome: number, amt: string) => {
+    if (!address) return
+    const parsed = BigInt(Math.floor(parseFloat(amt) * 1e18))
+    if (parsed <= 0n) return
+    if (userAllowance < parseFloat(amt)) {
       approve({
         address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'approve',
-        args: [PREDICTION_MARKET_ADDRESS, amountParsed],
+        args: [PREDICTION_MARKET_ADDRESS, parsed],
       })
     } else {
       bet({
         address: PREDICTION_MARKET_ADDRESS, abi: predictionMarketABI, functionName: 'bet',
-        args: [BigInt(marketId), selectedOutcome, amountParsed],
+        args: [BigInt(marketId), outcome, parsed],
       })
     }
+  }
+
+  const handleApprove = async (amt: string) => {
+    const parsed = BigInt(Math.floor(parseFloat(amt) * 1e18))
+    if (parsed <= 0n) return
+    approve({
+      address: CORN_TOKEN_ADDRESS, abi: cornTokenABI, functionName: 'approve',
+      args: [PREDICTION_MARKET_ADDRESS, parsed],
+    })
   }
 
   const handleClaim = async () => {
@@ -108,26 +112,19 @@ export function MarketDetail({ marketId, onBack }: Props) {
             <span className="text-muted">您的余额：</span> <span className="font-medium">{userBalance.toFixed(4)} CORN</span>
           </div>
 
-          {isOpen && address && !deadlinePassed && (
+          {isOpen && !deadlinePassed && (
             <div className="space-y-3 border-t border-border pt-4">
               <h3 className="font-semibold">下注</h3>
-              <div className="space-y-2">
-                <Label>选项</Label>
-                <Select value={String(selectedOutcome)} onValueChange={(v) => setSelectedOutcome(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">YES</SelectItem>
-                    <SelectItem value="1">NO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>数量（CORN）</Label>
-                <Input type="number" placeholder="0.00" min="0" step="0.01" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} />
-              </div>
-              <Button className="w-full" disabled={!betAmount || parseFloat(betAmount) <= 0} onClick={handleBet}>
-                {userAllowance < parseFloat(betAmount || '0') ? '授权' : '下注'}
-              </Button>
+              <TradingPanel
+                yesPool={yesPool}
+                noPool={noPool}
+                feeBps={Number(feeBps) || 0}
+                userBalance={userBalance}
+                userAllowance={userAllowance}
+                connected={!!address}
+                onBet={handleBet}
+                onApprove={handleApprove}
+              />
             </div>
           )}
 

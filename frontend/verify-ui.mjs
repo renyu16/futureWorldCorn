@@ -86,6 +86,31 @@ async function main() {
     record('trending section renders', false, e.message.split('\n')[0])
   }
 
+  // 3c. Trading panel on market detail (Polymarket-style YES/NO tabs + Max + estimated payout)
+  const trendingFirst = page.locator('[data-testid="trending-card"]').first()
+  if ((await trendingFirst.count()) > 0) {
+    await trendingFirst.click()
+  } else {
+    const openCardBtn = page.locator('main div:has-text("进行中") button:has-text("查看详情")').first()
+    await openCardBtn.click()
+  }
+  const yesTab = page.locator('[data-testid="outcome-yes"]')
+  const noTab = page.locator('[data-testid="outcome-no"]')
+  const maxBtn = page.locator('[data-testid="max-btn"]')
+  try {
+    await yesTab.first().waitFor({ state: 'visible', timeout: 30000 })
+    record('trading panel renders', (await yesTab.count()) > 0 && (await noTab.count()) > 0 && (await maxBtn.count()) > 0)
+    await page.locator('[data-testid="bet-amount"]').fill('10')
+    const payout = page.locator('[data-testid="est-payout"]')
+    const payoutVisible = await payout.isVisible().catch(() => false)
+    const payoutText = payoutVisible ? await payout.innerText().catch(() => '') : ''
+    record('payout estimate renders with amount', payoutVisible && /CORN/.test(payoutText), payoutText.split('\n')[0])
+  } catch (e) {
+    record('trading panel renders', false, e.message.split('\n')[0])
+  }
+  await page.locator('main button:has-text("返回")').first().click()
+  await page.waitForTimeout(500)
+
   // 4. Nav tabs render without crashing
   const tabs = [
     ['市场', 'h2:has-text("市场（")'],

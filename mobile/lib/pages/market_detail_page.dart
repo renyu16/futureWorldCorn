@@ -102,16 +102,15 @@ class _MarketDetailPageState extends ConsumerState<MarketDetailPage> {
     try {
       final id = cat.classifyQuestion(question);
       final keywords = <String>[];
-      if (id == cat.categoryOther || id == 'tech' || id == 'economy') {
-        keywords.addAll(['crypto', '区块链', '市场']);
-      } else {
-        keywords.addAll(NewsService.defaultKeywords.where((k) => k != 'crypto'));
-        keywords.add(id);
+      for (final c in cat.categories) {
+        if (c.id == id) {
+          keywords.addAll(c.keywords);
+          break;
+        }
       }
-      if (keywords.isNotEmpty) {
-        final news = await NewsService.fetch(keywords.take(2).toList());
-        if (mounted) setState(() => _relatedNews = news.take(5).toList());
-      }
+      if (keywords.isEmpty) keywords.addAll(NewsService.defaultKeywords);
+      final news = await NewsService.fetch(keywords.take(2).toList());
+      if (mounted) setState(() => _relatedNews = news.take(5).toList());
     } catch (_) {}
   }
 

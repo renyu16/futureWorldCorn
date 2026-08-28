@@ -66,12 +66,18 @@ class _HomePageState extends ConsumerState<HomePage> {
             return Center(child: Text('暂无市场。', style: TextStyle(color: AppTheme.muted)));
           }
           final filtered = filterAndSort(markets, _filters);
+          final featured = markets.where((m) => m.isOpen && m.totalPool > 0).toList()
+            ..sort((a, b) => b.totalPool.compareTo(a.totalPool));
+          if (featured.length > 5) featured.removeRange(5, featured.length);
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(marketsProvider),
+            onRefresh: () async {
+              await _loadNews();
+              ref.invalidate(marketsProvider);
+            },
             child: ListView(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                _FeaturedCarousel(markets: markets.where((m) => m.isOpen).toList(), onSelect: _goToDetail),
+                _FeaturedCarousel(markets: featured, onSelect: _goToDetail),
                 const SizedBox(height: 16),
                 if (_news.isNotEmpty)
                   _BreakingNewsSection(
@@ -583,9 +589,9 @@ class _FeaturedCarousel extends StatelessWidget {
     if (markets.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        const Icon(Icons.local_fire_department, color: AppTheme.no, size: 18),
+        const Icon(Icons.local_fire_department, color: AppTheme.primary, size: 18),
         const SizedBox(width: 6),
-        const Text('热门市场', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text('精选', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ]),
       const SizedBox(height: 12),
       SizedBox(

@@ -13,7 +13,7 @@ class NewsService {
   static const _cacheDuration = Duration(minutes: 5);
   static final Map<String, (List<NewsItem>, DateTime)> _cache = {};
 
-  static List<String> defaultKeywords = ['crypto', '比特币', '以太坊', '美联储', 'fed'];
+  static List<String> defaultKeywords = const ['crypto', '比特币', '以太坊', '美联储', 'fed'];
 
   static Future<List<NewsItem>> fetch(List<String> keywords) async {
     final key = keywords.join(',');
@@ -38,7 +38,7 @@ class NewsService {
     }
     unique.sort((a, b) => b.published.compareTo(a.published));
     final top = unique.length > 20 ? unique.sublist(0, 20) : unique;
-    _cache[key] = (top, DateTime.now());
+    if (top.isNotEmpty) _cache[key] = (top, DateTime.now());
     return top;
   }
 

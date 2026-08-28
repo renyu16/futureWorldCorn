@@ -1,0 +1,507 @@
+<project_specification>
+  <project_name>预测大师 (Prediction Master)</project_name>
+  <mode>existing-codebase</mode>
+
+  <project_goal>
+    将预测大师 dApp 从 MVP 提升到 Polymarket 级别的生产质量：完成合约部署、修复投资组合页、添加价格图表、完善结算时间线、补充前端测试，使所有功能可在 World Chain Sepolia 上完整运行。
+  </project_goal>
+
+  <overview>
+    预测大师是部署在 World Chain Sepolia 上的去中心化预测市场 dApp，使用 CORN 代币进行 AMM 下注，Chainlink 预言机结算，World ID 争议仲裁，以及 bicameral 治理（TokenHouse + HumanHouse）。
+
+    当前状态：6 个智能合约已完成并通过 53 项测试，前端覆盖 7 个主要用户流程。但 3 个合约地址未部署（治理和争议页无法使用），投资组合页显示所有市场而非用户持仓，缺少价格图表和结算时间线可视化。
+
+    目标用户：World Chain 生态的预测市场参与者。体验目标：像 Polymarket 一样专业流畅，但完全去中心化且基于 World ID 身份验证。
+  </overview>
+
+  <domain>
+    <glossary>
+      <term name="CORN" avoid="corn, CornToken">ERC-20 治理代币，用于下注、争议保证金和治理投票</term>
+      <term name="GovCORN" avoid="govCorn">CORN 的 ERC-20Votes 包装代币，用于 TokenHouse 治理投票权</term>
+      <term name="Market" avoid="prediction">一个预测市场实例，包含问题、YES/NO 资金池、截止时间和结算状态</term>
+      <term name="Share" avoid="token, position">用户在某市场 YES 或 NO 方向持有的份额，结算后可兑换 CORN</term>
+      <term name="Dispute" avoid="challenge, arbitration">HumanHouse 中对市场结果的正式争议，需要 CORN 保证金</term>
+      <term name="Resolver" avoid="oracle">被授权结算市场的地址（owner 或注册 resolver）</term>
+      <term name="feeBps" avoid="fee">市场手续费，以基点表示（1 bps = 0.01%），从输家资金池扣除</term>
+    </glossary>
+    <bounded_contexts>
+      <context name="market-core" generator_context="market-core">
+        <responsibility>市场生命周期：创建、下注、结算、领取奖励、手续费收集</responsibility>
+        <relationships>依赖 CORN 代币进行结算；Resolver 结算市场结果</relationships>
+      </context>
+      <context name="portfolio" generator_context="portfolio">
+        <responsibility>用户持仓展示：过滤用户持有的市场、显示份额数量和盈亏</responsibility>
+        <relationships>读取 market-core 的 sharesYes/sharesNo 数据</relationships>
+      </context>
+      <context name="price-chart" generator_context="price-chart">
+        <responsibility>价格历史可视化：YES/NO 价格曲线、成交量、流动性指标</responsibility>
+        <relationships>读取 market-core 的 BetPlaced 事件生成价格数据</relationships>
+      </context>
+      <context name="resolution-timeline" generator_context="resolution-timeline">
+        <responsibility>Polymarket 式结算流程可视化：提议→挑战→投票→裁决</responsibility>
+        <relationships>读取 market-core 的 MarketResolved 事件和 HumanHouse 的争议事件</relationships>
+      </context>
+      <context name="dispute-system" generator_context="dispute-system">
+        <responsibility>HumanHouse 争议系统：发起、投票、执行、活动时间线</responsibility>
+        <relationships>依赖 market-core 的 disputeResolve 翻转结果</relationships>
+      </context>
+      <context name="governance" generator_context="governance">
+        <responsibility>TokenHouse 治理：提案、投票、队列、执行</responsibility>
+        <relationships>依赖 GovCORN 代币的投票权</relationships>
+      </context>
+      <context name="contract-deployment" generator_context="contract-deployment">
+        <responsibility>部署 GovCrownToken、TokenHouse、HumanHouse 到 World Chain Sepolia</responsibility>
+        <relationships>部署后更新前端合约地址配置</relationships>
+      </context>
+    </bounded_contexts>
+  </domain>
+
+  <technology_stack>
+    <general>Monorepo: Solidity contracts (Foundry) + React frontend (Vite). World Chain Sepolia (chainId 4801)。</general>
+    <frontend>
+      <framework>React 18 + Vite</framework>
+      <styling>Tailwind CSS 4 + Radix UI + shadcn/ui</styling>
+      <state_management>wagmi v2 + TanStack React Query</state_management>
+      <routing>Tab-based SPA (no router)</routing>
+      <port>5173</port>
+      <patterns>Custom hooks for contract reads/writes, component-based UI</patterns>
+    </frontend>
+    <backend>removed (纯前端 dApp，无后端)</backend>
+    <communication>wagmi hooks 直接调用 World Chain Sepolia RPC + Alchemy 公共端点</communication>
+  </technology_stack>
+
+  <integrations>
+    <integration name="World Chain Sepolia">
+      <responsibility>区块链网络，运行所有智能合约</responsibility>
+      <availability>required</availability>
+      <configuration>RPC: https://worldchain-sepolia.g.alchemy.com/public, ChainId: 4801</configuration>
+      <security>用户通过 RainbowKit 连接钱包签名交易</security>
+      <failure_behavior>RPC 限流时显示错误提示，支持重试</failure_behavior>
+      <deployment>World Chain Sepolia 测试网</deployment>
+      <affected_surfaces>所有页面的读写操作</affected_surfaces>
+    </integration>
+    <integration name="Chainlink Oracle">
+      <responsibility>提供价格数据用于市场结算</responsibility>
+      <availability>optional（仅 OracleAdapter 使用的市场需要）</availability>
+      <configuration>Chainlink AggregatorV3Interface feeds</configuration>
+      <security>Keeper 角色限制调用权限</security>
+      <failure_behavior>Feed 不可用时交易 revert</failure_behavior>
+      <deployment>已部署 OracleAdapter 合约</deployment>
+      <affected_surfaces>OracleAdapter 结算路径</affected_surfaces>
+    </integration>
+    <integration name="World ID">
+      <responsibility>一人一票身份验证（HumanHouse 争议投票）</responsibility>
+      <availability>optional（当前前端为模拟模式）</availability>
+      <configuration>World ID Router 合约地址</configuration>
+      <security>ZKP 验证防止双投</security>
+      <failure_behavior>前端使用零值模拟证明，合约验证会 revert 无效证明</failure_behavior>
+      <deployment>已部署 HumanHouse 合约（含 World ID 集成）</deployment>
+      <affected_surfaces>HumanHouse 投票功能</affected_surfaces>
+    </integration>
+    <integration name="lightweight-charts">
+      <responsibility>价格历史图表渲染</responsibility>
+      <availability>required</availability>
+      <configuration>npm package lightweight-charts</configuration>
+      <security>纯前端渲染，无安全风险</security>
+      <failure_behavior>图表加载失败时显示降级数据视图</failure_behavior>
+      <deployment>npm install lightweight-charts</deployment>
+      <affected_surfaces>MarketDetail 页面价格图表区域</affected_surfaces>
+    </integration>
+  </integrations>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 18+ 已安装
+      - Foundry (forge) 已安装用于合约编译和部署
+      - World Chain Sepolia 测试网 ETH（部署合约需要）
+      - CORN 代币已部署: 0x6a07C7b64702E67f32d14f55F26dAAc94082B981
+      - PredictionMarket 已部署: 0xAecA3704114B03d2d85f6EC5C4df83b277A657bb
+      - 前端开发服务器: npm run dev (port 5173)
+      - Alchemy API Key 用于 RPC（已在 main.tsx 配置）
+    </environment_setup>
+  </prerequisites>
+
+  <core_features>
+    <contract-deployment>
+      - 部署 GovCrownToken 合约到 World Chain Sepolia
+      - 部署 TokenHouse 合约（含 TimelockController）
+      - 部署 HumanHouse 合约（含 World ID Router 集成）
+      - 更新前端 abi.ts 中的合约地址
+      - 验证所有合约在链上可正常交互
+    </contract-deployment>
+
+    <portfolio>
+      - 投资组合页只显示用户实际持有份额的市场
+      - 读取 sharesYes/sharesNo 映射过滤用户持仓
+      - 显示每个持仓的份额数量、当前价值、盈亏
+      - 显示持仓总值和 CORN 余额
+      - 支持按市场状态筛选（进行中/已结算）
+    </portfolio>
+
+    <price-chart>
+      - 在 MarketDetail 页面添加 YES/NO 价格历史图表
+      - 使用 lightweight-charts 渲染专业金融图表
+      - 从 BetPlaced 事件生成价格数据点
+      - 显示当前价格、24h 变化、成交量
+      - 显示流动性深度指标
+      - 图表响应式适配移动端
+    </price-chart>
+
+    <resolution-timeline>
+      - 在 MarketDetail 页面添加 Polymarket 式结算时间线
+      - 可视化流程：创建→下注→截止→结算→领取
+      - 显示当前阶段和下一步操作
+      - 已结算市场显示最终结果和奖金分配
+      - 争议市场显示争议状态和投票进度
+    </resolution-timeline>
+
+    <dispute-system>
+      - HumanHouse 争议列表增强：显示保证金、票数、进度条
+      - 争议详情页活动时间线（发起→投票→执行）
+      - 争议详情页投票记录列表
+      - 市场详情页关联争议摘要
+      - 市场详情页「发起争议」按钮（预填 marketId）
+      - 争议列表和详情中的市场 ID 可点击跳转
+    </dispute-system>
+
+    <governance>
+      - TokenHouse 治理提案列表
+      - 创建提案（含 calldata 构建器）
+      - 投票（赞成/反对/弃权）
+      - 队列和执行提案
+      - 委托投票权管理
+    </governance>
+
+    <market-core>
+      - 市场创建表单（问题、截止时间、手续费）
+      - YES/NO 下注面板（含滑点估算）
+      - 结算市场（owner/resolver）
+      - 领取奖励
+      - 市场列表（搜索、筛选、排序、无限滚动）
+      - 市场详情（资金池、倒计时、状态）
+    </market-core>
+
+    <testing>
+      - 前端组件单元测试（React Testing Library）
+      - 投资组合过滤逻辑测试
+      - 价格图表数据生成测试
+      - 结算时间线状态机测试
+      - 争议系统完整流程测试
+    </testing>
+  </core_features>
+
+  <acceptance_checks>
+    <!-- Contract Deployment -->
+    <acceptance_check id="AC-001" context="contract-deployment" category="foundation" depends_on="">
+      <description>部署 GovCrownToken 合约，forge verify 验证成功，前端能读取总供应量</description>
+    </acceptance_check>
+    <acceptance_check id="AC-002" context="contract-deployment" category="foundation" depends_on="AC-001">
+      <description>部署 TokenHouse 合约（含 TimelockController），owner 可以创建提案</description>
+    </acceptance_check>
+    <acceptance_check id="AC-003" context="contract-deployment" category="foundation" depends_on="">
+      <description>部署 HumanHouse 合约，前端能读取争议保证金金额</description>
+    </acceptance_check>
+    <acceptance_check id="AC-004" context="contract-deployment" category="foundation" depends_on="AC-001,AC-002,AC-003">
+      <description>更新 frontend/src/contracts/abi.ts 中 GOV_CORN_TOKEN_ADDRESS、TOKEN_HOUSE_ADDRESS、HUMAN_HOUSE_ADDRESS 为真实部署地址</description>
+    </acceptance_check>
+
+    <!-- Portfolio -->
+    <acceptance_check id="AC-010" context="portfolio" category="functional" depends_on="">
+      <description>连接钱包后，投资组合页只显示用户持有 YES 或 NO 份额的市场，不显示无持仓的市场</description>
+    </acceptance_check>
+    <acceptance_check id="AC-011" context="portfolio" category="functional" depends_on="AC-010">
+      <description>每个持仓卡片显示：市场问题、YES/NO 份额数量、当前价值（基于资金池比例计算）、盈亏百分比</description>
+    </acceptance_check>
+    <acceptance_check id="AC-012" context="portfolio" category="functional" depends_on="AC-010">
+      <description>投资组合页顶部显示：持仓总值、CORN 余额、活跃持仓数、已结算持仓数</description>
+    </acceptance_check>
+    <acceptance_check id="AC-013" context="portfolio" category="edge-case" depends_on="">
+      <description>未连接钱包时显示「连接钱包以查看投资组合」提示</description>
+    </acceptance_check>
+
+    <!-- Price Chart -->
+    <acceptance_check id="AC-020" context="price-chart" category="functional" depends_on="">
+      <description>MarketDetail 页面显示 lightweight-charts 折线图，X 轴为时间，Y 轴为 YES 价格（0-100%）</description>
+    </acceptance_check>
+    <acceptance_check id="AC-021" context="price-chart" category="functional" depends_on="AC-020">
+      <description>图表数据从 BetPlaced 事件生成，每个事件计算当时的 YES 价格 = outcomeYes / (outcomeYes + outcomeNo)</description>
+    </acceptance_check>
+    <acceptance_check id="AC-022" context="price-chart" category="functional" depends_on="AC-020">
+      <description>图表上方显示：当前 YES 价格、24h 变化百分比、总成交量、总流动性</description>
+    </acceptance_check>
+    <acceptance_check id="AC-023" context="price-chart" category="style" depends_on="AC-020">
+      <description>图表在移动端（&lt;640px）高度自适应，桌面端固定高度 300px</description>
+    </acceptance_check>
+    <acceptance_check id="AC-024" context="price-chart" category="edge-case" depends_on="">
+      <description>无交易历史的市场显示「暂无价格数据」降级视图</description>
+    </acceptance_check>
+
+    <!-- Resolution Timeline -->
+    <acceptance_check id="AC-030" context="resolution-timeline" category="functional" depends_on="">
+      <description>MarketDetail 页面在资金池下方显示结算时间线，包含：创建、下注、截止、结算、领取 5 个阶段</description>
+    </acceptance_check>
+    <acceptance_check id="AC-031" context="resolution-timeline" category="functional" depends_on="AC-030">
+      <description>当前阶段高亮显示，已完成阶段显示绿色勾，未到达阶段显示灰色圆点</description>
+    </acceptance_check>
+    <acceptance_check id="AC-032" context="resolution-timeline" category="functional" depends_on="AC-030">
+      <description>争议市场在时间线中显示争议分支，展示争议状态和票数</description>
+    </acceptance_check>
+    <acceptance_check id="AC-033" context="resolution-timeline" category="functional" depends_on="AC-030">
+      <description>已结算市场显示最终结果（YES/NO 胜）和奖金分配摘要</description>
+    </acceptance_check>
+
+    <!-- Dispute System (already mostly complete) -->
+    <acceptance_check id="AC-040" context="dispute-system" category="functional" depends_on="">
+      <description>争议列表每行显示保证金金额、赞成/反对票数、迷你进度条</description>
+    </acceptance_check>
+    <acceptance_check id="AC-041" context="dispute-system" category="functional" depends_on="">
+      <description>争议详情页显示活动时间线：发起事件、每个投票事件、执行裁决事件，带时间戳</description>
+    </acceptance_check>
+    <acceptance_check id="AC-042" context="dispute-system" category="functional" depends_on="">
+      <description>市场详情页关联争议区域显示每个争议的状态徽章、票数进度条、保证金</description>
+    </acceptance_check>
+
+    <!-- Governance (needs deployed contracts) -->
+    <acceptance_check id="AC-050" context="governance" category="functional" depends_on="AC-002">
+      <description>连接钱包后，治理页能读取并显示 TokenHouse 的提案列表</description>
+    </acceptance_check>
+    <acceptance_check id="AC-051" context="governance" category="functional" depends_on="AC-002">
+      <description>用户可以创建提案，投票（赞成/反对/弃权），队列和执行提案</description>
+    </acceptance_check>
+
+    <!-- Testing -->
+    <acceptance_check id="AC-060" context="testing" category="functional" depends_on="">
+      <description>Portfolio 组件测试：mock 市场数据，验证只显示用户持仓的市场</description>
+    </acceptance_check>
+    <acceptance_check id="AC-061" context="testing" category="functional" depends_on="">
+      <description>价格图表组件测试：mock BetPlaced 事件，验证图表渲染和数据点生成</description>
+    </acceptance_check>
+    <acceptance_check id="AC-062" context="testing" category="functional" depends_on="">
+      <description>结算时间线组件测试：验证各状态下阶段显示正确</description>
+    </acceptance_check>
+  </acceptance_checks>
+
+  <planning_decisions>
+    <decision id="D-001" topic="architectural-tradeoff">
+      <question>合约部署顺序：GovCrownToken → TokenHouse → HumanHouse 是否必须串行？</question>
+      <options>
+        <option>串行部署：先 GovCrownToken，再 TokenHouse（依赖 GovCORN），最后 HumanHouse</option>
+        <option>并行部署：GovCrownToken 和 HumanHouse 可并行，TokenHouse 最后</option>
+      </options>
+      <choice>串行部署：GovCrownToken → TokenHouse → HumanHouse</choice>
+      <rationale>TokenHouse 依赖 GovCrownToken 地址，HumanHouse 独立但按顺序部署更清晰</rationale>
+      <acceptance_checks>AC-001, AC-002, AC-003</acceptance_checks>
+    </decision>
+
+    <decision id="D-002" topic="architectural-tradeoff">
+      <question>价格图表数据来源：链上事件 vs 预计算索引</question>
+      <options>
+        <option>链上事件：实时从 BetPlaced 事件生成，无额外依赖，但事件多时加载慢</option>
+        <option>预计算索引：维护子图或数据库，查询快但增加运维复杂度</option>
+      </options>
+      <choice>链上事件：实时从 BetPlaced 事件生成价格数据点</choice>
+      <rationale>MVP 阶段保持简单，直接用 publicClient.getLogs 获取事件，无需额外基础设施</rationale>
+      <acceptance_checks>AC-021</acceptance_checks>
+    </decision>
+
+    <decision id="D-003" topic="edge-case">
+      <question>无交易历史的市场如何显示价格图表？</question>
+      <options>
+        <option>显示「暂无价格数据」空状态</option>
+        <option>隐藏图表区域</option>
+        <option>显示初始价格线（50%）</option>
+      </options>
+      <choice>显示「暂无价格数据」空状态，保留图表容器避免布局跳动</choice>
+      <rationale>空状态比隐藏更一致，用户知道图表存在但暂时无数据</rationale>
+      <acceptance_checks>AC-024</acceptance_checks>
+    </decision>
+
+    <decision id="D-004" topic="edge-case">
+      <question>投资组合中已结算但未领取奖励的市场如何显示？</question>
+      <options>
+        <option>显示「可领取」按钮，点击直接领取</option>
+        <option>只显示状态，用户需进入市场详情页领取</option>
+      </options>
+      <choice>在持仓卡片中直接显示「可领取」按钮，点击后调用 claimReward</choice>
+      <rationale>减少用户操作步骤，Polymarket 也是在投资组合中直接领取</rationale>
+      <acceptance_checks>AC-011</acceptance_checks>
+    </decision>
+
+    <decision id="D-005" topic="architectural-tradeoff">
+      <question>前端测试框架选择</question>
+      <options>
+        <option>Vitest + React Testing Library（Vite 原生支持）</option>
+        <option>Jest + React Testing Library（通用但需额外配置）</option>
+      </options>
+      <choice>Vitest + React Testing Library</choice>
+      <rationale>Vite 项目用 Vitest 零配置，与 Vite 共享配置，启动更快</rationale>
+      <acceptance_checks>AC-060, AC-061, AC-062</acceptance_checks>
+    </decision>
+
+    <deferred>
+      World ID 真实集成：当前前端使用模拟证明，真实集成需要 World ID SDK 和用户身份验证流程，复杂度高，延后到主网部署阶段。
+      移动端原生应用：当前为响应式 Web，不做原生 App。
+      多语言支持：当前仅中文 UI，不做 i18n。
+    </deferred>
+  </planning_decisions>
+
+  <database_schema>
+    <tables>removed（纯前端 dApp，数据存储在区块链上）</tables>
+  </database_schema>
+
+  <api_endpoints_summary>
+    removed（无后端 API，所有数据通过 wagmi hooks 从区块链读取）
+  </api_endpoints_summary>
+
+  <ui_layout>
+    <main_structure>
+      顶部固定导航栏（Logo + 标签页 + 钱包连接），主内容区最大宽度 6xl（1152px），居中布局。
+      标签页：市场、创建（仅 owner）、投资组合、委托、治理、争议。
+    </main_structure>
+    <market-detail>
+      卡片式布局：市场信息卡片、价格图表卡片、下注面板、结算时间线、关联争议。
+      图表区域在资金池信息下方，高度 300px（桌面）/ 200px（移动端）。
+    </market-detail>
+    <portfolio>
+      顶部统计卡片（总值、余额、持仓数），下方持仓列表。
+      每个持仓卡片：市场信息 + 份额 + 盈亏 + 操作按钮。
+    </portfolio>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      主色：蓝色（#3b82f6），成功：绿色（#22c55e），失败：红色（#ef4444），
+      背景：#f8f9fb，卡片：白色，边框：#e5e7eb，文字：#1f2937，次要文字：#6b7280
+    </color_palette>
+    <typography>系统字体栈，标题 font-bold，正文 text-sm/text-base</typography>
+    <components>
+      Button: rounded-lg, active:scale-[0.97], shrink-0
+      Card: shadow-sm, hover:shadow-md transition
+      Badge: default/success/destructive/secondary 变体
+      Tabs: gap-1, hide-scrollbar, overflow-x-auto
+    </components>
+    <animations>
+      Toast: slide-in-from-top, 3s 自动消失
+      Countdown: 脉冲绿点动画
+      按钮: active:scale-[0.97] 按压反馈
+      图表: 平滑折线动画
+    </animations>
+  </design_system>
+
+  <key_interactions>
+    <flow name="部署合约">
+      1. 运行 forge script 部署 GovCrownToken，记录地址
+      2. 运行 forge script 部署 TokenHouse（传入 GovCORN 地址），记录地址
+      3. 运行 forge script 部署 HumanHouse（传入 CORN、PredictionMarket、WorldID 地址），记录地址
+      4. 更新 abi.ts 中的合约地址
+      5. 验证前端能读取新合约数据
+    </flow>
+    <flow name="投资组合查看">
+      1. 用户连接钱包
+      2. 前端读取所有市场的 sharesYes/marketId/user 和 sharesNo/marketId/user
+      3. 过滤出份额 > 0 的市场
+      4. 计算每个持仓的当前价值和盈亏
+      5. 显示持仓列表，支持筛选和排序
+    </flow>
+    <flow name="价格图表查看">
+      1. 用户进入 MarketDetail 页面
+      2. 前端从 BetPlaced 事件获取交易历史
+      3. 计算每个时间点的 YES 价格
+      4. lightweight-charts 渲染折线图
+      5. 显示当前价格、24h 变化、成交量
+    </flow>
+    <flow name="结算时间线">
+      1. 用户进入 MarketDetail 页面
+      2. 前端根据 market 状态和 deadline 判断当前阶段
+      3. 渲染 5 阶段时间线，高亮当前阶段
+      4. 已结算市场显示最终结果和奖金分配
+      5. 争议市场显示争议分支状态
+    </flow>
+  </key_interactions>
+
+  <implementation_steps>
+    <step number="1">
+      <title>合约部署</title>
+      <tasks>
+        <task>部署 GovCrownToken 到 World Chain Sepolia，运行 forge verify-contract 验证</task>
+        <task>部署 TimelockController（最小延迟 1 天）</task>
+        <task>部署 TokenHouse（传入 GovCORN 地址、Timelock 地址），验证提案创建</task>
+        <task>部署 HumanHouse（传入 CORN、PredictionMarket、WorldID Router 地址）</task>
+        <task>更新 frontend/src/contracts/abi.ts 中的 3 个占位符地址</task>
+        <task>验证：运行 npm run dev，检查治理页和争议页能读取链上数据</task>
+      </tasks>
+    </step>
+    <step number="2">
+      <title>投资组合重构</title>
+      <tasks>
+        <task>修改 hooks/useMarket.ts 添加 useUserPositions(address) hook，遍历市场读取用户份额</task>
+        <task>重写 Portfolio.tsx：只显示用户持仓的市场，添加统计卡片</task>
+        <task>添加份额价值计算：基于资金池比例估算当前价值</task>
+        <task>添加已结算市场的「可领取」按钮</task>
+        <task>验证：AC-010, AC-011, AC-012, AC-013</task>
+      </tasks>
+    </step>
+    <step number="3">
+      <title>价格图表</title>
+      <tasks>
+        <task>安装 lightweight-charts: npm install lightweight-charts</task>
+        <task>创建 components/PriceChart.tsx 组件，封装 lightweight-charts</task>
+        <task>创建 lib/priceHistory.ts 工具函数，从 BetPlaced 事件生成价格数据</task>
+        <task>在 MarketDetail.tsx 中集成 PriceChart 组件</task>
+        <task>添加统计指标：当前价格、24h 变化、成交量、流动性</task>
+        <task>验证：AC-020, AC-021, AC-022, AC-023, AC-024</task>
+      </tasks>
+    </step>
+    <step number="4">
+      <title>结算时间线</title>
+      <tasks>
+        <task>创建 components/ResolutionTimeline.tsx 组件</task>
+        <task>实现 5 阶段状态机：创建→下注→截止→结算→领取</task>
+        <task>在 MarketDetail.tsx 中集成 ResolutionTimeline</task>
+        <task>添加争议分支显示</task>
+        <task>验证：AC-030, AC-031, AC-032, AC-033</task>
+      </tasks>
+    </step>
+    <step number="5">
+      <title>前端测试</title>
+      <tasks>
+        <task>安装 Vitest + React Testing Library + jsdom</task>
+        <task>配置 vitest.config.ts</task>
+        <task>编写 Portfolio 过滤逻辑测试</task>
+        <task>编写 PriceChart 数据生成测试</task>
+        <task>编写 ResolutionTimeline 状态机测试</task>
+        <task>验证：AC-060, AC-061, AC-062</task>
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - 3 个合约成功部署并可在链上交互
+      - 投资组合页只显示用户持仓
+      - 价格图表正确渲染交易历史
+      - 结算时间线准确反映市场状态
+      - 所有 53 个现有测试继续通过
+      - 新增测试覆盖核心逻辑
+    </functionality>
+    <user_experience>
+      - 投资组合一目了然，无需手动查找持仓
+      - 价格图表像 Polymarket 一样专业
+      - 结算流程清晰可见
+      - 所有操作有 toast 反馈
+      - 移动端可用
+    </user_experience>
+    <technical_quality>
+      - TypeScript 编译无错误
+      - 所有测试通过
+      - 合约部署脚本可重复运行
+      - 代码遵循现有风格
+    </technical_quality>
+    <design_polish>
+      - 图表与现有 UI 风格一致
+      - 时间线组件视觉清晰
+      - 统计卡片数据准确
+      - 响应式布局完善
+    </design_polish>
+  </success_criteria>
+</project_specification>

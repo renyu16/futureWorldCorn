@@ -48,3 +48,9 @@ export function useWriteClaimReward() {
 export function useWriteResolveMarket() {
   return useWriteContract()
 }
+
+export function useAllMarkets() {
+  const { data: count, isLoading, isError, error, refetch } = useMarketCount()
+  const total = Number(count ?? 0)
+  return { total, isLoading, isError, error, refetch }
+}

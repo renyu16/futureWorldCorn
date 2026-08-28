@@ -1,7 +1,7 @@
 import { parseAbi } from 'viem'
 
-export const CORN_TOKEN_ADDRESS = '0x6a07C7b64702E67f32d14f55F26dAAc94082B981'
-export const PREDICTION_MARKET_ADDRESS = '0xAecA3704114B03d2d85f6EC5C4df83b277A657bb'
+export const CORN_TOKEN_ADDRESS = '0x7440503d25a38513919203e58db70d3ee14197ed'
+export const PREDICTION_MARKET_ADDRESS = '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026'
 
 export interface ContractAddresses {
   cornToken: `0x${string}`
@@ -11,9 +11,9 @@ export interface ContractAddresses {
 
 export const DeployedAddresses: Record<number, ContractAddresses> = {
   4801: {
-    cornToken: '0x6a07C7b64702E67f32d14f55F26dAAc94082B981',
-    predictionMarket: '0xAecA3704114B03d2d85f6EC5C4df83b277A657bb',
-    oracleAdapter: '0x617CEC12C21b4D4Def72afAd7858E7596e83dc82',
+    cornToken: '0x7440503d25a38513919203e58db70d3ee14197ed',
+    predictionMarket: '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026',
+    oracleAdapter: '0x1457eef9d78eda3e18095f3ff50e15f10764de72',
   },
   480: {
     cornToken: '0x...',
@@ -63,7 +63,7 @@ export const predictionMarketABI = parseAbi([
   'event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount)',
 ])
 
-export const GOV_CORN_TOKEN_ADDRESS = '0x...'
+export const GOV_CORN_TOKEN_ADDRESS = '0x3F540371f5E88E3B9625b63411e4ba1FDB4702f0'
 
 export const govCrownTokenABI = parseAbi([
   'function depositFor(address account, uint256 amount)',
@@ -75,10 +75,12 @@ export const govCrownTokenABI = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)',
+  'function delegates(address account) view returns (address)',
   'event Transfer(address indexed from, address indexed to, uint256 value)',
+  'event DelegateChanged(address indexed delegator, address indexed fromDelegate, address toDelegate)',
 ])
 
-export const TOKEN_HOUSE_ADDRESS = '0x...'
+export const TOKEN_HOUSE_ADDRESS = '0x70Edf96015fE901c44b6b61Ad5CcB9884B545DE9'
 
 export const tokenHouseABI = parseAbi([
   'function state(uint256 proposalId) view returns (uint8)',
@@ -95,10 +97,10 @@ export const tokenHouseABI = parseAbi([
   'function quorum(uint256 blockNumber) view returns (uint256)',
   'function getVotes(address account, uint256 blockNumber) view returns (uint256)',
   'function hashProposal(address[] targets, uint256[] values, bytes[] calldatas, bytes32 descriptionHash) view returns (uint256)',
-  'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
+  'event ProposalCreated(uint256 indexed proposalId, address indexed proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
 ])
 
-export const HUMAN_HOUSE_ADDRESS = '0x...'
+export const HUMAN_HOUSE_ADDRESS = '0xd1062855477c08bff3c852fc42844ca35db32c72'
 
 export const humanHouseABI = parseAbi([
   'function raiseDispute(uint256 marketId, uint8 disputeType, string reason)',

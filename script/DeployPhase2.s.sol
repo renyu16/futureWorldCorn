@@ -26,8 +26,6 @@ contract DeployPhase2 is Script {
             minDelay, proposers, new address[](0), deployer
         );
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
-        timelock.grantRole(timelock.DEFAULT_ADMIN_ROLE(), address(timelock));
-        timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
 
         PredictionMarket market = PredictionMarket(marketProxy);
         market.transferOwnership(address(timelock));

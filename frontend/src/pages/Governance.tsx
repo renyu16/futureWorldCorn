@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAccount, usePublicClient, useReadContract } from 'wagmi'
 import { formatEther, encodeFunctionData } from 'viem'
 import {
   TOKEN_HOUSE_ADDRESS, tokenHouseABI,
   GOV_CORN_TOKEN_ADDRESS, govCrownTokenABI,
 } from '../contracts/abi'
+import { getLogsChunked } from '../lib/getLogsChunked'
 import {
   useProposalState, useProposalVotes, useProposalProposer,
   useProposalDeadline, useProposalSnapshot, useCastVote,
@@ -16,7 +18,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 const STATE_LABEL: Record<string, string> = {
   Pending: '待定', Active: '进行中', Canceled: '已取消', Defeated: '未通过',
@@ -26,17 +29,19 @@ const STATE_LABEL: Record<string, string> = {
 const STATE_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'destructive'> = {
   Pending: 'secondary', Active: 'default', Succeeded: 'success',
   Queued: 'success', Executed: 'success', Defeated: 'destructive',
-  取消ed: 'secondary', Expired: 'secondary',
+  Canceled: 'secondary', Expired: 'secondary',
 }
 
 function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
+  const { toast } = useToast()
   const { data: state } = useProposalState(id)
   const { data: votes } = useProposalVotes(id)
   const { data: proposer } = useProposalProposer(id)
   const { data: deadline } = useProposalDeadline(id)
   const { data: snapshot } = useProposalSnapshot(id)
-  const { writeContract } = useCastVote()
+  const { writeContract, isPending: isVotePending } = useCastVote()
   const { address } = useAccount()
+  const queryClient = useQueryClient()
 
   const { data: userVotes } = useReadContract({
     address: GOV_CORN_TOKEN_ADDRESS,
@@ -67,10 +72,10 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
             <div><span className="text-muted">快照区块：</span><br />{snapshot?.toString() || '—'}</div>
             <div><span className="text-muted">截止区块：</span><br />{deadline?.toString() || '—'}</div>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div><span className="text-yes font-medium">赞成：</span><br />{forVotes !== undefined ? formatEther(forVotes) : '—'} govCORN</div>
-            <div><span className="text-no font-medium">反对：</span><br />{against !== undefined ? formatEther(against) : '—'} govCORN</div>
-            <div><span className="text-muted font-medium">弃权：</span><br />{abstain !== undefined ? formatEther(abstain) : '—'} govCORN</div>
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+            <div><span className="text-yes font-medium">赞成：</span><br />{forVotes !== undefined ? Number(formatEther(forVotes)).toFixed(4) : '—'} govCORN</div>
+            <div><span className="text-no font-medium">反对：</span><br />{against !== undefined ? Number(formatEther(against)).toFixed(4) : '—'} govCORN</div>
+            <div><span className="text-muted font-medium">弃权：</span><br />{abstain !== undefined ? Number(formatEther(abstain)).toFixed(4) : '—'} govCORN</div>
           </div>
 
           {state === 'Active' && address && (
@@ -79,34 +84,43 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
                 您的投票权： <span className="font-medium text-foreground">{userVotes ? formatEther(userVotes as bigint) : '0'} govCORN</span>
               </p>
               {userVotes !== undefined && (userVotes as bigint) > 0n && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    className="border-transparent bg-yes text-white hover:bg-yes/90"
-                    onClick={() => writeContract({
+                    className="min-w-0 border-transparent bg-yes text-white hover:bg-yes/90"
+                    disabled={isVotePending}
+                    onClick={() => { toast('交易已提交，请等待确认...', 'info'); writeContract({
                       address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
                       functionName: 'castVote',
                       args: [id, 1],
-                    })}
-                  >赞成</Button>
+                    }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['readContract'] }); toast('投票成功', 'success') }, onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error') }) }}
+                  >
+                    {isVotePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '赞成'}
+                  </Button>
                   <Button
                     variant="outline"
-                    className="border-transparent bg-no text-white hover:bg-no/90"
-                    onClick={() => writeContract({
+                    className="min-w-0 border-transparent bg-no text-white hover:bg-no/90"
+                    disabled={isVotePending}
+                    onClick={() => { toast('交易已提交，请等待确认...', 'info'); writeContract({
                       address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
                       functionName: 'castVote',
                       args: [id, 0],
-                    })}
-                  >反对</Button>
+                    }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['readContract'] }); toast('投票成功', 'success') }, onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error') }) }}
+                  >
+                    {isVotePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '反对'}
+                  </Button>
                   <Button
                     variant="outline"
-                    className="border-transparent bg-muted text-white hover:bg-muted/90"
-                    onClick={() => writeContract({
+                    className="min-w-0 border-transparent bg-muted text-white hover:bg-muted/90"
+                    disabled={isVotePending}
+                    onClick={() => { toast('交易已提交，请等待确认...', 'info'); writeContract({
                       address: TOKEN_HOUSE_ADDRESS, abi: tokenHouseABI,
                       functionName: 'castVote',
                       args: [id, 2],
-                    })}
-                  >弃权</Button>
+                    }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['readContract'] }); toast('投票成功', 'success') }, onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error') }) }}
+                  >
+                    {isVotePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '弃权'}
+                  </Button>
                 </div>
               )}
             </div>
@@ -118,14 +132,15 @@ function ProposalDetail({ id, onBack }: { id: bigint; onBack: () => void }) {
 }
 
 function CreateProposal({ onCreated }: { onCreated: () => void }) {
+  const { toast } = useToast()
   const { address } = useAccount()
   const [target, setTarget] = useState('')
   const [value, setValue] = useState('0')
   const [funcSig, setFuncSig] = useState('')
   const [argsJson, setArgsJson] = useState('[]')
-  const [description, set描述] = useState('')
+  const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const { writeContract } = usePropose()
+  const { writeContract, isPending: isProposePending } = usePropose()
 
   const { data: threshold } = useProposalThreshold()
   const { data: userVotes } = useReadContract({
@@ -148,6 +163,7 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
         ? encodeFunctionData({ abi, functionName: fnName, args })
         : '0x'
 
+      toast('交易已提交，请等待确认...', 'info')
       writeContract({
         address: TOKEN_HOUSE_ADDRESS,
         abi: tokenHouseABI,
@@ -159,7 +175,8 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
           description,
         ],
       }, {
-        onSuccess: () => { setTarget(''); setValue('0'); setFuncSig(''); setArgsJson('[]'); set描述(''); onCreated() },
+        onSuccess: () => { setTarget(''); setValue('0'); setFuncSig(''); setArgsJson('[]'); setDescription(''); onCreated(); toast('交易成功', 'success') },
+        onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error'),
       })
     } catch (e: any) {
       setError(e.message || 'Failed to build calldata')
@@ -176,34 +193,37 @@ function CreateProposal({ onCreated }: { onCreated: () => void }) {
         <p className="text-sm text-no">投票权不足，无法发起提案。请委托或获取更多 govCORN。</p>
       )}
       <div className="space-y-2">
-        <Label>目标地址</Label>
-        <Input value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." className="font-mono" />
+        <Label htmlFor="proposal-target">目标地址</Label>
+        <Input id="proposal-target" value={target} onChange={e => setTarget(e.target.value)} placeholder="0x..." className="font-mono" />
       </div>
       <div className="space-y-2">
-        <Label>ETH 数值（wei）</Label>
-        <Input value={value} onChange={e => setValue(e.target.value)} placeholder="0" />
+        <Label htmlFor="proposal-value">ETH 数值（wei）</Label>
+        <Input id="proposal-value" value={value} onChange={e => setValue(e.target.value)} placeholder="0" />
       </div>
       <div className="space-y-2">
-        <Label>函数签名（可选）</Label>
-        <Input value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" />
+        <Label htmlFor="proposal-funcsig">函数签名（可选）</Label>
+        <Input id="proposal-funcsig" value={funcSig} onChange={e => setFuncSig(e.target.value)} placeholder="transfer(address,uint256)" />
       </div>
       {funcSig && (
         <div className="space-y-2">
-          <Label>参数（JSON 数组）</Label>
-          <Input value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' className="font-mono" />
+          <Label htmlFor="proposal-args">参数（JSON 数组）</Label>
+          <Input id="proposal-args" value={argsJson} onChange={e => setArgsJson(e.target.value)} placeholder='["0x1234...", 1000000000000000000]' className="font-mono" />
         </div>
       )}
       <div className="space-y-2">
-        <Label>描述</Label>
+        <Label htmlFor="proposal-desc">描述</Label>
         <textarea
+          id="proposal-desc"
           value={description}
-          onChange={e => set描述(e.target.value)}
+          onChange={e => setDescription(e.target.value)}
           rows={3}
           className="flex min-h-[80px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
       </div>
       {error && <p className="text-sm text-no">{error}</p>}
-      <Button className="w-full" disabled={!canPropose || !validAddress || !description} onClick={handleSubmit}>提交提案</Button>
+      <Button className="w-full" disabled={!canPropose || !validAddress || !description || isProposePending} onClick={handleSubmit}>
+        {isProposePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '提交提案'}
+      </Button>
     </div>
   )
 }
@@ -213,47 +233,53 @@ export function Governance() {
   const publicClient = usePublicClient()
   const [proposals, setProposals] = useState<Array<{ id: bigint; description: string }>>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<bigint | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!publicClient) return
     setLoading(true)
+    let cancelled = false
     ;(async () => {
       if (!TOKEN_HOUSE_ADDRESS.startsWith('0x') || TOKEN_HOUSE_ADDRESS.length < 42) {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
         return
       }
-      const latestBlock = await publicClient.getBlockNumber()
-      const fromBlock = latestBlock > 100n ? latestBlock - 100n : 0n
-      publicClient.getLogs({
-        address: TOKEN_HOUSE_ADDRESS,
-        event: {
-          type: 'event',
-          name: 'ProposalCreated',
-          inputs: [
-            { type: 'uint256', name: 'proposalId', indexed: false },
-            { type: 'address', name: 'proposer', indexed: false },
-            { type: 'address[]', name: 'targets', indexed: false },
-            { type: 'uint256[]', name: 'values', indexed: false },
-            { type: 'string[]', name: 'signatures', indexed: false },
-            { type: 'bytes[]', name: 'calldatas', indexed: false },
-            { type: 'uint256', name: 'voteStart', indexed: false },
-            { type: 'uint256', name: 'voteEnd', indexed: false },
-            { type: 'string', name: 'description', indexed: false },
-          ],
-        },
-        fromBlock,
-        toBlock: 'latest',
-      }).then(logs => {
-        setProposals((logs as any[]).map(l => ({
-          id: (l.args as any).proposalId as bigint,
-          description: (l.args as any).description as string,
-        })).reverse())
-        setLoading(false)
-      }).catch(() => setLoading(false))
+      try {
+        const logs = await getLogsChunked(publicClient, {
+          address: TOKEN_HOUSE_ADDRESS,
+          event: {
+            type: 'event',
+            name: 'ProposalCreated',
+            inputs: [
+              { type: 'uint256', name: 'proposalId', indexed: true },
+              { type: 'address', name: 'proposer', indexed: true },
+              { type: 'address[]', name: 'targets', indexed: false },
+              { type: 'uint256[]', name: 'values', indexed: false },
+              { type: 'string[]', name: 'signatures', indexed: false },
+              { type: 'bytes[]', name: 'calldatas', indexed: false },
+              { type: 'uint256', name: 'voteStart', indexed: false },
+              { type: 'uint256', name: 'voteEnd', indexed: false },
+              { type: 'string', name: 'description', indexed: false },
+            ],
+          },
+          maxBlocks: 20000n,
+        })
+        if (!cancelled) {
+          setProposals((logs as any[]).map(l => ({
+            id: (l.args as any).proposalId as bigint,
+            description: (l.args as any).description as string,
+          })).reverse())
+          setLoading(false)
+        }
+      } catch (e) {
+        if (!cancelled) { setLoading(false); setLoadError('提案加载失败，请检查网络后重试。') }
+      }
     })()
-  }, [publicClient])
+    return () => { cancelled = true }
+  }, [publicClient?.uid, refreshKey])
 
   if (selectedId !== null) {
     return <ProposalDetail id={selectedId} onBack={() => setSelectedId(null)} />
@@ -275,10 +301,10 @@ export function Governance() {
             <DialogTitle>创建提案</DialogTitle>
             <DialogDescription>提交链上治理提案。需要 govCORN 投票权达到门槛以上。</DialogDescription>
           </DialogHeader>
-          <CreateProposal onCreated={() => { setShowForm(false); setLoading(true) }} />
+          <CreateProposal onCreated={() => { setShowForm(false); setRefreshKey(k => k + 1) }} />
         </DialogContent>
       </Dialog>
-      {loading ? <p className="text-muted">加载提案中...</p> : proposals.length === 0 ? <p className="text-muted">暂无提案。</p> : (
+      {loading ? <p className="text-muted">加载提案中...</p> : loadError ? <p className="text-no">{loadError}</p> : proposals.length === 0 ? <p className="text-muted">暂无提案。</p> : (
         <div className="space-y-3">
           {proposals.map(p => (
             <ProposalRow key={p.id.toString()} proposal={p} onSelect={() => setSelectedId(p.id)} />

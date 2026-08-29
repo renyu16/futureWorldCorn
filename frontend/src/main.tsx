@@ -9,35 +9,42 @@ import '@rainbow-me/rainbowkit/styles.css'
 import './globals.css'
 import App from './App'
 import { setupDeepLink } from './capacitor'
-
-const DEFAULT_RPC = 'https://worldchain-sepolia.g.alchemy.com/public'
+import {
+  CHAIN_ID,
+  CHAIN_NAME,
+  RPC_URL,
+  EXPLORER_URL,
+  NATIVE_CURRENCY_NAME,
+  NATIVE_CURRENCY_SYMBOL,
+  PROJECT_ID,
+} from './config'
 
 function getRpcUrl(): string {
   try {
-    return localStorage.getItem('app_rpc_url') || DEFAULT_RPC
+    return localStorage.getItem('app_rpc_url') || RPC_URL
   } catch {
-    return DEFAULT_RPC
+    return RPC_URL
   }
 }
 
 const rpcUrl = getRpcUrl()
 
 const worldChain = defineChain({
-  id: 4801,
-  name: 'World Chain Sepolia',
-  network: 'world-chain-sepolia',
-  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  id: CHAIN_ID,
+  name: CHAIN_NAME,
+  network: CHAIN_ID === 480 ? 'world-chain' : 'world-chain-sepolia',
+  nativeCurrency: { name: NATIVE_CURRENCY_NAME, symbol: NATIVE_CURRENCY_SYMBOL, decimals: 18 },
   rpcUrls: {
     default: { http: [rpcUrl] },
   },
   blockExplorers: {
-    default: { name: 'Worldscan', url: 'https://worldchain-sepolia.explorer.alchemy.com' },
+    default: { name: 'Worldscan', url: EXPLORER_URL },
   },
 })
 
 const config = getDefaultConfig({
   appName: '预测大师',
-  projectId: '38cfd0c495d4727d3d7e51ec3824a052',
+  projectId: PROJECT_ID,
   chains: [worldChain],
   transports: {
     [worldChain.id]: http(rpcUrl, { timeout: 8000 }),

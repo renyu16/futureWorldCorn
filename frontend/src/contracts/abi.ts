@@ -1,34 +1,12 @@
 import { parseAbi } from 'viem'
+import { ADDRESSES, getConfig } from '../config'
 
-export const CORN_TOKEN_ADDRESS = '0x7440503d25a38513919203e58db70d3ee14197ed'
-export const PREDICTION_MARKET_ADDRESS = '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026'
+// 合约地址统一在 src/config.ts 管理（双链 + 环境变量覆盖），此处仅导出当前构建的值。
+// 正式上线：改 frontend/.env 后重新构建即可切换，无需改源码（详见 config.ts 顶部注释）。
+export const CORN_TOKEN_ADDRESS = ADDRESSES.cornToken as `0x${string}`
+export const PREDICTION_MARKET_ADDRESS = ADDRESSES.predictionMarket as `0x${string}`
 
-export interface ContractAddresses {
-  cornToken: `0x${string}`
-  predictionMarket: `0x${string}`
-  oracleAdapter: `0x${string}`
-}
-
-export const DeployedAddresses: Record<number, ContractAddresses> = {
-  4801: {
-    cornToken: '0x7440503d25a38513919203e58db70d3ee14197ed',
-    predictionMarket: '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026',
-    oracleAdapter: '0x1457eef9d78eda3e18095f3ff50e15f10764de72',
-  },
-  480: {
-    cornToken: '0x...',
-    predictionMarket: '0x...',
-    oracleAdapter: '0x...',
-  },
-}
-
-export function getConfig(chainId: number): ContractAddresses {
-  const config = DeployedAddresses[chainId]
-  if (!config) {
-    throw new Error(`No deployment config found for chain ID ${chainId}`)
-  }
-  return config
-}
+export { getConfig }
 
 export const cornTokenABI = parseAbi([
   'function balanceOf(address owner) view returns (uint256)',
@@ -63,7 +41,7 @@ export const predictionMarketABI = parseAbi([
   'event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount)',
 ])
 
-export const GOV_CORN_TOKEN_ADDRESS = '0x3F540371f5E88E3B9625b63411e4ba1FDB4702f0'
+export const GOV_CORN_TOKEN_ADDRESS = ADDRESSES.govCornToken as `0x${string}`
 
 export const govCrownTokenABI = parseAbi([
   'function depositFor(address account, uint256 amount)',
@@ -80,7 +58,7 @@ export const govCrownTokenABI = parseAbi([
   'event DelegateChanged(address indexed delegator, address indexed fromDelegate, address toDelegate)',
 ])
 
-export const TOKEN_HOUSE_ADDRESS = '0x70Edf96015fE901c44b6b61Ad5CcB9884B545DE9'
+export const TOKEN_HOUSE_ADDRESS = ADDRESSES.tokenHouse as `0x${string}`
 
 export const tokenHouseABI = parseAbi([
   'function state(uint256 proposalId) view returns (uint8)',
@@ -100,7 +78,7 @@ export const tokenHouseABI = parseAbi([
   'event ProposalCreated(uint256 indexed proposalId, address indexed proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
 ])
 
-export const HUMAN_HOUSE_ADDRESS = '0xd1062855477c08bff3c852fc42844ca35db32c72'
+export const HUMAN_HOUSE_ADDRESS = ADDRESSES.humanHouse as `0x${string}`
 
 export const humanHouseABI = parseAbi([
   'function raiseDispute(uint256 marketId, uint8 disputeType, string reason)',

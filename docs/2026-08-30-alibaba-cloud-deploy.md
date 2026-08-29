@@ -149,7 +149,50 @@ tail -f server.log
 
 **升级前端**：本地重新 `npm run build` → 用新 `web/` 整目录替换旧 `web/` → `./stop.sh && ./start.sh`（无需重装 Node）。
 
-## 9. HTTPS / 域名迁移（后续）
+## 9. 修改链 / 合约地址 / RPC（测试网 ↔ 主网）
+
+前端为纯静态站点，链、RPC、WalletConnect、合约地址均为**构建时配置**（源码集中在 `frontend/src/config.ts`，可用 `frontend/.env` 覆盖）。切换需改配置 → 重新构建 → 替换部署目录 `web/`。
+
+### 9.1 配置项一览
+
+```bash
+cd frontend
+cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
+```
+
+| 变量 | 当前值（GET） | 说明 |
+|------|---------------|------|
+| `VITE_CHAIN_ID` | `4801`（测试网）/ `480`（主网） | 目标链切换开关 |
+| `VITE_RPC_URL` | 缺省按链用 Alchemy 公网 | 自有节点可覆盖 |
+| `VITE_EXPLORER_URL` | 缺省按链映射 | 区块浏览器 |
+| `VITE_PROJECT_ID` | 内置开发用 ID | 需自行注册：[cloud.walletconnect.com](https://cloud.walletconnect.com)（免费） |
+| `VITE_CORN_TOKEN_ADDRESS` | 见 config.ts 内置表 | 合约地址覆盖（可选）|
+| `VITE_PREDICTION_MARKET_ADDRESS` | 同上 | 同上 |
+| `VITE_ORACLE_ADAPTER_ADDRESS` | 同上 | 同上 |
+| `VITE_GOV_CORN_TOKEN_ADDRESS` | 同上 | 同上 |
+| `VITE_TOKEN_HOUSE_ADDRESS` | 同上 | 同上 |
+| `VITE_HUMAN_HOUSE_ADDRESS` | 同上 | 同上 |
+
+### 9.2 正式上线（480 主网）步骤
+
+1. `frontend/.env` 设 `VITE_CHAIN_ID=480`
+2. 填入 6 个合约地址（来自 `forge script` 部署输出，**无需注册**）：`CornToken`、`PredictionMarket`(proxy)、`OracleAdapter`、`GovCornToken`、`TokenHouse`、`HumanHouse`
+3. 需要时覆盖 RPC / Explorer / ProjectID（ProjectID 需去 WalletConnect Cloud 注册）
+4. 重新构建：
+   ```bash
+   cd frontend
+   npm run build
+   ```
+5. 用新 `frontend/dist/` 整目录替换服务器 `web/`，重启：
+   ```bash
+   cd ~/<日期>/server
+   ./stop.sh && ./start.sh
+   ```
+6. 重新冒烟（见 [7. 验证](#7-验证））。
+
+> 测试网 4801 地址已内置可直接用；灰度可先保持 4801 验证，再切 480。
+
+## 10. HTTPS / 域名迁移（后续）
 
 当前为 **IP + HTTP(8085)**。域名与证书就绪后：
 
@@ -158,7 +201,7 @@ tail -f server.log
 3. nginx 配置 `server_name <域名>`，443 反代/静态指向 `~/2026-08-30/web`（SPA 需 `try_files $uri /index.html;`）
 4. certbot 自动续期证书；安全组放行 443；8085 可关闭或仅内网
 
-## 10. 故障排查
+## 11. 故障排查
 
 | 现象 | 排查 |
 |------|------|

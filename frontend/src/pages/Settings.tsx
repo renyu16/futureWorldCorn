@@ -5,9 +5,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useToast } from '../components/Toast'
 import { Settings as SettingsIcon, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { RPC_URL as DEFAULT_RPC } from '../config'
 
 const STORAGE_KEY_RPC = 'app_rpc_url'
-const DEFAULT_RPC = 'https://worldchain-sepolia.g.alchemy.com/public'
 
 export function getStoredRpcUrl(): string {
   try {
@@ -120,7 +120,7 @@ export function Settings() {
               id="rpc-url"
               value={rpcUrl}
               onChange={(e) => { setRpcUrl(e.target.value); setTestResult(null) }}
-              placeholder="https://worldchain-sepolia.g.alchemy.com/public"
+              placeholder={DEFAULT_RPC}
               className="font-mono text-sm"
               autoComplete="url"
             />
@@ -180,7 +180,7 @@ export function Settings() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm text-muted">
-            <p>默认：<span className="font-mono text-xs">https://worldchain-sepolia.g.alchemy.com/public</span></p>
+            <p>默认：<span className="font-mono text-xs">{DEFAULT_RPC}</span></p>
             <p>局域网示例：<span className="font-mono text-xs">http://192.168.1.100:8545</span></p>
             <p>本机测试：<span className="font-mono text-xs">http://127.0.0.1:8545</span>（需 adb reverse）</p>
           </div>

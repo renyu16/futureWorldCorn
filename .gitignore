@@ -33,3 +33,6 @@ vite.log
 frontend/dev_*.log
 frontend/screen*.png
 frontend/screenshot_*.png
+
+# 部署交付包（组装产物）
+release/

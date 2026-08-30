@@ -18,16 +18,27 @@ release/<YYYY-MM-DD>/
     └── app-release.apk    # Flutter release 构建（模板默认签名，测试安装用）
 ```
 
-## 2. 前置条件
+## 2. 安全准则：最小暴露（Least Privilege）
+
+本项目安全立场：**不必要不暴露，需要才暴露**（与 Polymarket 等"全公开"路线区分，见 [架构对比](./2026-08-30-architecture-vs-polymarket.md)）。
+
+- **公网只开业务必需端口**（默认 `8085`），其它端口一律不开放
+- **安全组默认拒绝、最小放行**：只放行业务所需来源；内测期收窄为运维 / 测试公网 IP 白名单，正式公开运营前不写 `0.0.0.0/0`
+- **SSH(22) 仅对运维 IP 放行**、仅密钥登录，不用密码
+- **不与业务无关的软件不装**；示例 `.env` 中未启用的配置项不开启，避免引入不必要面
+- **链上权限与 Web 服务器分离**：keeper / resolveMarket / 治理角色密钥不部署到对外服务的机器
+- **构建产物不公开**：`release/`、`frontend/dist/`、`.env` 均不入库
+
+## 3. 前置条件
 
 - 阿里云 ECS，Alibaba Cloud Linux 3（自带 `dnf`），有 `root` 或 `sudo`
-- 端口：目标 **8085/tcp**（可改，见 [8. 运维](#8-运维)）
+- 端口：目标 **8085/tcp**（可改，见 [9. 运维](#9-运维)）
 - 服务器无需 Node 预装（`install-node.sh` 自动安装），无需 npm 依赖
 - 本地开发机有能与目标机互通的网络
 
-## 3. 本地：构建与组装交付包
+## 4. 本地：构建与组装交付包
 
-> 使用已交付的 `release/<日期>/` 可直接跳到 [4. 上传](#4-上传)。下面用于重新打包。
+> 使用已交付的 `release/<日期>/` 可直接跳到 [5. 上传](#5-上传)。下面用于重新打包。
 
 ```powershell
 # 前端（代码有变动时）
@@ -53,7 +64,7 @@ Copy-Item mobile/build/app/outputs/flutter-apk/app-release.apk "release/$d/andro
 Get-ChildItem -Recurse "release/$d" | Select-Object FullName, Length
 ```
 
-## 4. 上传交付包
+## 5. 上传交付包
 
 本地开发机执行（Windows PowerShell）：
 
@@ -61,14 +72,14 @@ Get-ChildItem -Recurse "release/$d" | Select-Object FullName, Length
 scp -r ./release/2026-08-30 <user>@<server-ip>:~/
 ```
 
-## 5. 服务器部署
+## 6. 服务器部署
 
 ```bash
 ssh <user>@<server-ip>
 cd ~/2026-08-30/server
 ```
 
-### 5.1 安装 Node（缺少或 <18 时）
+### 6.1 安装 Node（缺少或 <18 时）
 
 ```bash
 sudo ./install-node.sh
@@ -77,7 +88,7 @@ node -v        # 期望 v18+
 
 > 脚本优先使用 `dnf module` 安装 nodejs:20，失败时回退 NodeSource 20；root 运行。
 
-### 5.2 启动服务
+### 6.2 启动服务
 
 ```bash
 ./start.sh
@@ -94,7 +105,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8085/
 # 200
 ```
 
-### 5.3 放行 8085
+### 6.3 放行 8085
 
 ```bash
 sudo firewall-cmd --permanent --add-port=8085/tcp
@@ -102,16 +113,23 @@ sudo firewall-cmd --reload
 sudo firewall-cmd --list-ports    # 确认 8085/tcp
 ```
 
-## 6. 阿里云安全组放行（控制台）
+## 7. 阿里云安全组放行（默认拒绝 + 最小放行）
+
+> 原则见 [2. 安全准则](#2-安全准则最小暴露least-privilege)：默认拒绝，需要才放行。
 
 1. 登录阿里云控制台 → ECS → 实例 → 该实例 → **安全组**
-2. 入方向 → 手动添加规则：
-   - 协议类型：**TCP**
-   - 端口范围：**8085/8085**
-   - 授权对象：`0.0.0.0/0`（可收紧为特定公网 IP 段）
-3. 保存后约 1 分钟生效
+2. 确认当前策略为**默认拒绝**（未放行的端口不可入站）；在已有规则基础上逐条最小放行，不叠加无关端口
+3. 入方向 → 手动添加规则（按需最小化）：
+   | 用途 | 协议 | 端口 | 授权对象（最小化） |
+   |------|------|------|---------------------|
+   | 业务入口（必备） | TCP | **8085** | 内测期：运维/测试公网 IP 段；正式公开运营才改为 `0.0.0.0/0` |
+   | SSH 运维（收敛） | TCP | 22 | 仅运维公网 IP；优先改端口 + 密钥登录 |
+   | HTTPS（后续） | TCP | 443 | 仅域名解析目标；届时 8085 可改为仅内网 |
+4. 保存后约 1 分钟生效
 
-## 7. 验证
+> 最小暴露提醒：**不要**一次性放行 `0.0.0.0/0` 的 8085，除非明确进入公开运营；未使用端口（8545 等）不放行。
+
+## 8. 验证
 
 ### 7.1 公网冒烟（浏览器 / curl）
 
@@ -136,7 +154,7 @@ adb install -r app-release.apk
 
 或把 APK 发给设备直接安装。钱包走 WalletConnect，与网页共用一套。
 
-## 8. 运维
+## 9. 运维
 
 ```bash
 cd ~/2026-08-30/server
@@ -149,7 +167,7 @@ tail -f server.log
 
 **升级前端**：本地重新 `npm run build` → 用新 `web/` 整目录替换旧 `web/` → `./stop.sh && ./start.sh`（无需重装 Node）。
 
-## 9. 修改链 / 合约地址 / RPC（测试网 ↔ 主网）
+## 10. 修改链 / 合约地址 / RPC（测试网 ↔ 主网）
 
 前端为纯静态站点，链、RPC、WalletConnect、合约地址均为**构建时配置**（源码集中在 `frontend/src/config.ts`，可用 `frontend/.env` 覆盖）。切换需改配置 → 重新构建 → 替换部署目录 `web/`。
 
@@ -188,11 +206,11 @@ cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
    cd ~/<日期>/server
    ./stop.sh && ./start.sh
    ```
-6. 重新冒烟（见 [7. 验证](#7-验证））。
+6. 重新冒烟（见 [8. 验证](#8-验证））。
 
 > 测试网 4801 地址已内置可直接用；灰度可先保持 4801 验证，再切 480。
 
-## 10. HTTPS / 域名迁移（后续）
+## 11. HTTPS / 域名迁移（后续）
 
 当前为 **IP + HTTP(8085)**。域名与证书就绪后：
 
@@ -201,11 +219,11 @@ cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
 3. nginx 配置 `server_name <域名>`，443 反代/静态指向 `~/2026-08-30/web`（SPA 需 `try_files $uri /index.html;`）
 4. certbot 自动续期证书；安全组放行 443；8085 可关闭或仅内网
 
-## 11. 故障排查
+## 12. 故障排查
 
 | 现象 | 排查 |
 |------|------|
-| 外网打不开，本机 200 | 安全组未放行 8085（见 [6](#6-阿里云安全组放行控制台)）；`firewall-cmd --list-ports` 确认 |
+| 外网打不开，本机 200 | 安全组未放行 8085（见 [7](#7-阿里云安全组放行控制台)）；`firewall-cmd --list-ports` 确认 |
 | `start.sh` 报地址占用 | `ss -tlnp | grep 8085` 查占用；`stop.sh` 清理后重启，或换端口 |
 | 深链刷新 404 | 确认用的是 `web/` 且启动参数 `--dir` 指向它；旧 serve 进程未停会占 8085 |
 | `install-node.sh` 失败 | 需 root；curl 可用；dnf 源可达（`dnf makecache`）|

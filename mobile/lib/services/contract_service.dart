@@ -377,4 +377,22 @@ class ContractService {
   static String castVoteData(int proposalId, int support) {
     return '0xc0246668${_uintPadInt(proposalId)}${support.toRadixString(16).padLeft(64, '0')}';
   }
+
+  static Future<bool> isMarketCreator(String rpcUrl, String userAddress) {
+    return _readBool(rpcUrl, addr.predictionMarketAddress, '0x1d6c8bc8${_addrPad(userAddress)}');
+  }
+
+  static String createMarketData(String question, int deadline, int feeBps) {
+    final qBytes = utf8.encode(question);
+    final qLen = qBytes.length;
+    final qHex = qBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final qPaddedLen = ((qLen + 31) ~/ 32) * 32;
+    final qPadded = qHex.padRight(qPaddedLen * 2, '0');
+    return '0xd4c034b7'
+        '${(96).toRadixString(16).padLeft(64, '0')}'
+        '${deadline.toRadixString(16).padLeft(64, '0')}'
+        '${feeBps.toRadixString(16).padLeft(64, '0')}'
+        '${qLen.toRadixString(16).padLeft(64, '0')}'
+        '$qPadded';
+  }
 }

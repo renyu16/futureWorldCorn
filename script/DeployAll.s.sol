@@ -12,65 +12,99 @@ import "../src/TokenHouse.sol";
 import "../src/HumanHouse.sol";
 
 contract DeployAll is Script {
+    struct Cfg {
+        address deployer;
+        address feeCollector;
+        address keeper;
+        address safeAddress;
+        address worldIdRouter;
+        uint256 disputeDeposit;
+        string appId;
+        string actionId;
+    }
+
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer = vm.addr(deployerKey);
-        address feeCollector = vm.envOr("FEE_COLLECTOR", deployer);
-        address keeper = vm.envOr("KEEPER", deployer);
-        address safeAddress = vm.envAddress("SAFE_ADDRESS");
-        address worldIdRouter = vm.envAddress("WORLD_ID_ROUTER_ADDRESS");
-        string memory appId = vm.envString("WORLD_ID_APP_ID");
-        string memory actionId = vm.envOr("WORLD_ID_ACTION_ID", string("human_house_vote"));
-        uint256 disputeDeposit = vm.envOr("DISPUTE_DEPOSIT", uint256(1000e18));
-
+        Cfg memory cfg = _readCfg();
         vm.startBroadcast(deployerKey);
+        _deployAll(cfg);
+        vm.stopBroadcast();
+    }
 
-        // Phase 1: Core contracts
-        CornToken token = new CornToken();
-        PredictionMarket implementation = new PredictionMarket();
-        bytes memory initData = abi.encodeWithSelector(
-            PredictionMarket.initialize.selector,
-            address(token),
-            feeCollector,
-            deployer
-        );
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
-        PredictionMarket market = PredictionMarket(address(proxy));
-        OracleAdapter adapter = new OracleAdapter(address(market), keeper);
-        market.setResolver(address(adapter), true);
+    function _readCfg() internal returns (Cfg memory cfg) {
+        cfg.deployer = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        cfg.feeCollector = vm.envOr("FEE_COLLECTOR", cfg.deployer);
+        cfg.keeper = vm.envOr("KEEPER", cfg.deployer);
+        cfg.safeAddress = vm.envAddress("SAFE_ADDRESS");
+        cfg.worldIdRouter = vm.envAddress("WORLD_ID_ROUTER_ADDRESS");
+        cfg.disputeDeposit = vm.envOr("DISPUTE_DEPOSIT", uint256(1000e18));
+        cfg.appId = vm.envString("WORLD_ID_APP_ID");
+        cfg.actionId = vm.envOr("WORLD_ID_ACTION_ID", string("human_house_vote"));
+    }
 
-        // Phase 2: Governance (keep admin with deployer)
-        GovCrownToken govCorn = new GovCrownToken(IERC20(address(token)));
-        address[] memory proposers = new address[](1);
-        proposers[0] = safeAddress;
-        TimelockController timelock = new TimelockController(
-            2 days, proposers, new address[](0), deployer
-        );
-        timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
-        // NOTE: deployer keeps DEFAULT_ADMIN_ROLE for Phase 3 deployment
-
-        // Phase 3: Houses
+    function _deployAll(Cfg memory cfg) internal {
+        (CornToken token, PredictionMarket market) = _deployCore(cfg);
+        GovCrownToken govCorn = _deployGovernance(token, cfg);
+        TimelockController timelock = _createTimelock(cfg);
         TokenHouse tokenHouse = new TokenHouse(IVotes(address(govCorn)), timelock);
         HumanHouse humanHouse = new HumanHouse(
             address(token),
             address(market),
-            disputeDeposit,
-            IWorldID(worldIdRouter),
-            appId,
-            actionId
+            cfg.disputeDeposit,
+            IWorldID(cfg.worldIdRouter),
+            cfg.appId,
+            cfg.actionId
         );
+        _finalize(token, market, timelock, tokenHouse, humanHouse, cfg);
+    }
 
-        // Grant proposer roles
+    function _deployCore(Cfg memory cfg)
+        internal
+        returns (CornToken token, PredictionMarket market)
+    {
+        token = new CornToken();
+        PredictionMarket implementation = new PredictionMarket();
+        bytes memory initData = abi.encodeWithSelector(
+            PredictionMarket.initialize.selector,
+            address(token),
+            cfg.feeCollector,
+            cfg.deployer
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        market = PredictionMarket(address(proxy));
+        OracleAdapter adapter = new OracleAdapter(address(market), cfg.keeper);
+        market.setResolver(address(adapter), true);
+    }
+
+    function _deployGovernance(CornToken token, Cfg memory cfg)
+        internal
+        returns (GovCrownToken govCorn)
+    {
+        govCorn = new GovCrownToken(IERC20(address(token)));
+    }
+
+    function _createTimelock(Cfg memory cfg) internal returns (TimelockController timelock) {
+        address[] memory proposers = new address[](1);
+        proposers[0] = cfg.safeAddress;
+        timelock = new TimelockController(2 days, proposers, new address[](0), cfg.deployer);
+        timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
+        // NOTE: deployer keeps DEFAULT_ADMIN_ROLE; revoked in _finalize
+    }
+
+    function _finalize(
+        CornToken token,
+        PredictionMarket market,
+        TimelockController timelock,
+        TokenHouse tokenHouse,
+        HumanHouse humanHouse,
+        Cfg memory cfg
+    ) internal {
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(tokenHouse));
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(humanHouse));
 
-        // Transfer core ownership to timelock
         market.transferOwnership(address(timelock));
         token.transferOwnership(address(timelock));
 
-        // Revoke deployer admin after everything is set up
-        timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
-
-        vm.stopBroadcast();
+        timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), cfg.deployer);
     }
 }

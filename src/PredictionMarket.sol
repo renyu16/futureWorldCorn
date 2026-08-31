@@ -19,6 +19,7 @@ contract PredictionMarket is
     address public feeCollector;
     uint256 public marketCount;
     mapping(address => bool) public resolvers;
+    mapping(address => bool) public marketCreators;
 
     enum Outcome { YES, NO }
     enum MarketStatus { Open, Resolved }
@@ -39,6 +40,7 @@ contract PredictionMarket is
     mapping(uint256 => mapping(address => bool)) public claimed;
 
     event MarketCreated(uint256 indexed id, string question, uint40 deadline);
+    event MarketCreatorSet(address indexed creator, bool active);
     event BetPlaced(uint256 indexed id, address indexed user, Outcome outcome, uint256 amount);
     event MarketResolved(uint256 indexed id, bool result);
     event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount);
@@ -63,7 +65,8 @@ contract PredictionMarket is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external onlyOwner {
+    function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external {
+        require(msg.sender == owner() || marketCreators[msg.sender], "unauthorized");
         require(deadline > block.timestamp, "deadline in past");
         uint16 marketFee = feeBps == 0 ? defaultFeeBps : feeBps;
         require(marketFee <= 1000, "fee too high");
@@ -76,6 +79,11 @@ contract PredictionMarket is
         m.feeBps = marketFee;
 
         emit MarketCreated(marketCount, question, deadline);
+    }
+
+    function setMarketCreator(address creator, bool active) external onlyOwner {
+        marketCreators[creator] = active;
+        emit MarketCreatorSet(creator, active);
     }
 
     function bet(uint256 marketId, Outcome outcome, uint256 amount) external nonReentrant {

@@ -179,7 +179,34 @@ contract PredictionMarketTest is Test {
 
     function test_OnlyOwnerCreate() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
+        vm.expectRevert("unauthorized");
         pm.createMarket(QUESTION, DEADLINE, 200);
+    }
+
+    function test_MarketCreatorCanCreate() public {
+        pm.setMarketCreator(bob, true);
+
+        vm.prank(bob);
+        pm.createMarket(QUESTION, DEADLINE, 200);
+
+        assertEq(pm.marketCount(), 1);
+        assertTrue(pm.marketCreators(bob));
+    }
+
+    function test_MarketCreatorRemovedCannotCreate() public {
+        pm.setMarketCreator(bob, true);
+        pm.setMarketCreator(bob, false);
+        assertFalse(pm.marketCreators(bob));
+
+        vm.prank(bob);
+        vm.expectRevert("unauthorized");
+        pm.createMarket(QUESTION, DEADLINE, 200);
+    }
+
+    function test_SetMarketCreatorOnlyOwner() public {
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, bob));
+        pm.setMarketCreator(alice, true);
+        assertFalse(pm.marketCreators(alice));
     }
 }

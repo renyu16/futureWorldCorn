@@ -1,6 +1,6 @@
 const int chainId = 4801;
 const String chainName = 'World Chain Sepolia';
-const String defaultRpcUrl = 'https://worldchain-sepolia.g.alchemy.com/public';
+const String defaultRpcUrl = 'http://8.141.100.69:8085/rpc';
 const String storageKeyRpc = 'app_rpc_url';
 
 const String cornTokenAddress = '0x7440503d25a38513919203e58db70d3ee14197ed';

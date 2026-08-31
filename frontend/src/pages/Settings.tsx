@@ -181,6 +181,7 @@ export function Settings() {
         <CardContent>
           <div className="space-y-2 text-sm text-muted">
             <p>默认：<span className="font-mono text-xs">{DEFAULT_RPC}</span></p>
+            <p>阿里云反代（手机网络可直连）：<span className="font-mono text-xs">http://8.141.100.69:8085/rpc</span></p>
             <p>局域网示例：<span className="font-mono text-xs">http://192.168.1.100:8545</span></p>
             <p>本机测试：<span className="font-mono text-xs">http://127.0.0.1:8545</span>（需 adb reverse）</p>
           </div>

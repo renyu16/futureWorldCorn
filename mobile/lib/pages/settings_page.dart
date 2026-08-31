@@ -113,7 +113,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       controller: _controller,
                       onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(
-                        hintText: 'https://worldchain-sepolia.g.alchemy.com/public',
+                        hintText: 'http://8.141.100.69:8085/rpc',
                       ),
                       style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                     ),

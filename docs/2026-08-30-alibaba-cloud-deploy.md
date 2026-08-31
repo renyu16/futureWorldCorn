@@ -10,7 +10,7 @@ release/<YYYY-MM-DD>/
 ├── README.md              # 面向目标机的简版说明
 ├── web/                   # 前端静态产物（Vite build，base './'，纯静态无后端）
 ├── server/                # 静态服务器脚本（Node>=18 内置 http，零 npm 依赖）
-│   ├── serve.mjs          # 静态服务器：SPA 回退 + 正确 MIME + 路径安全
+│   ├── serve.mjs          # 静态服务器：SPA 回退 + 正确 MIME + 路径安全 + POST /rpc JSON-RPC 反代
 │   ├── start.sh           # 启动（默认端口 8085，日志 server.log，写 .pid）
 │   ├── stop.sh            # 停止（带进程身份校验，清理陈旧 .pid）
 │   └── install-node.sh    # 安装 Node 18+（需 root；已装则跳过）
@@ -44,6 +44,8 @@ release/<YYYY-MM-DD>/
 # 前端（代码有变动时）
 cd frontend
 npm install
+# 部署在阿里云时 RPC 走服务器反代（手机网络直连 alchemy 可能失败）：
+$env:VITE_RPC_URL = "http://8.141.100.69:8085/rpc"
 npm run build            # 产物输出到 frontend/dist
 
 # Android APK（可选，代码有变动时）
@@ -210,6 +212,17 @@ cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
 
 > 测试网 4801 地址已内置可直接用；灰度可先保持 4801 验证，再切 480。
 
+### 9.3 JSON-RPC 反代 `/rpc`（手机网络直连 Alchemy 失败的解法）
+
+**现象**：手机（内地网络，无 VPN）上 APK 或网页报 `Failed host lookup: 'worldchain-sepolia.g.alchemy.com' (errno=7)` / 数据加载失败。根因是本地网络 DNS 解析/访问不了 alchemy.com；纯 IP 的 `8.141.100.69:8085` 则完全可达。
+
+**方案**：`serve.mjs` 内置 `POST /rpc` 反向代理，转发到上游节点（默认 `https://worldchain-sepolia.g.alchemy.com/public`，可用环境变量 `RPC_PROXY_UPSTREAM` 覆盖，如后续切主网 `RPC_PROXY_UPSTREAM=https://worldchain-mainnet.g.alchemy.com/public`）。手机只访问服务器 IP，不再依赖 alchemy.com 的 DNS。
+
+- 用法示例：`curl -X POST http://8.141.100.69:8085/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'`
+- web 端：构建时 `VITE_RPC_URL=http://8.141.100.69:8085/rpc`（本仓库交付包默认已如此构建）；也可不重新构建，在页面「设置 → RPC 节点」填入该地址（存 localStorage）
+- APK 端：交付包 APK 默认已指向该地址；老 APK 可在「更多 → 设置」里填 RPC 后保存
+- 反代为只读转发，避免引入额外暴露面；非 JSON-RPC 的 `/rpc` 请求返回 405
+
 ## 11. HTTPS / 域名迁移（后续）
 
 当前为 **IP + HTTP(8085)**。域名与证书就绪后：
@@ -228,4 +241,5 @@ cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
 | 深链刷新 404 | 确认用的是 `web/` 且启动参数 `--dir` 指向它；旧 serve 进程未停会占 8085 |
 | `install-node.sh` 失败 | 需 root；curl 可用；dnf 源可达（`dnf makecache`）|
 | 页面 JS 报跨域/白屏 | 打开 F12 Network，确认资源 200 且相对路径（以 `./` 开头），无 CDN 硬地址 |
+| APK/页面报 `Failed host lookup ... alchemy.com` | 网络 DNS 解析不了 alchemy，改用反代 `http://8.141.100.69:8085/rpc`（见 [9.3](#93-json-rpc-反代-rpc手机网络直连-alchemy-失败的解法)）|
 | 重启后自动失效 | 当前为前台启动方案；如需开机自启，可加 systemd unit 或 init 脚本（后续可提供） |

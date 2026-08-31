@@ -221,6 +221,7 @@ cp .env.example .env   # 首次使用时复制模板，之后直接编辑 .env
 - 用法示例：`curl -X POST http://8.141.100.69:8085/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'`
 - web 端：构建时 `VITE_RPC_URL=http://8.141.100.69:8085/rpc`（本仓库交付包默认已如此构建）；也可不重新构建，在页面「设置 → RPC 节点」填入该地址（存 localStorage）
 - APK 端：交付包 APK 默认已指向该地址；老 APK 可在「更多 → 设置」里填 RPC 后保存
+- 反代为**明文 HTTP**：Android 默认禁止访问 http，APK 已开启 `android:usesCleartextTraffic="true"`（见 `mobile/android/app/src/main/AndroidManifest.xml`），如后续上 HTTPS 可关闭该开关
 - 反代为只读转发，避免引入额外暴露面；非 JSON-RPC 的 `/rpc` 请求返回 405
 
 ## 11. HTTPS / 域名迁移（后续）

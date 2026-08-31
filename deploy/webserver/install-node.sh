@@ -25,7 +25,7 @@ if ! command -v dnf >/dev/null 2>&1; then
   exit 1
 fi
 
-# 1) 优先系统 dnf 模块（RHEL9 系自带 nodejs 20 模块）
+# 1) ???????????? dnf ?????????RHEL9 ????????? nodejs 20 ?????????
 if dnf module enable -y nodejs:20 2>/dev/null && dnf -y install nodejs 2>/dev/null; then
   hash -r
   if node -v 2>/dev/null | grep -qE '^v(1[89]|[2-9][0-9])\.'; then
@@ -34,7 +34,7 @@ if dnf module enable -y nodejs:20 2>/dev/null && dnf -y install nodejs 2>/dev/nu
   fi
 fi
 
-# 2) NodeSource 20（失败不中断）
+# 2) NodeSource 20?????????????????????
 if curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - 2>/dev/null; then
   dnf -y install nodejs
 fi

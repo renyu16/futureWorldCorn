@@ -43,7 +43,7 @@ nohup node serve.mjs --port "$PORT" --host 0.0.0.0 --dir "$WEB_DIR" > server.log
 echo $! > .pid
 sleep 1
 if kill -0 "$(cat .pid)" 2>/dev/null; then
-  echo "started on port $PORT (pid $(cat .pid)) — see server.log"
+  echo "started on port $PORT (pid $(cat .pid)) ??? see server.log"
 else
   echo "failed to start; see server.log" >&2
   rm -f .pid

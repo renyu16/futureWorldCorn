@@ -1,0 +1,5 @@
+# 部署到 Linux 的脚本与 Node 服务端文件统一 LF 行尾，
+# 避免 Windows 工作区 CRLF 检出后上传至服务器报
+# "/usr/bin/env: 'bash\r': No such file or directory"。
+*.sh text eol=lf
+*.mjs text eol=lf

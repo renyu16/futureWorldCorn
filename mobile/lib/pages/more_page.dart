@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:future_world_corn_mobile/pages/create_market_page.dart';
 import 'package:future_world_corn_mobile/pages/delegate_page.dart';
 import 'package:future_world_corn_mobile/pages/humanhouse_page.dart';
+import 'package:future_world_corn_mobile/pages/permission_page.dart';
 import 'package:future_world_corn_mobile/pages/settings_page.dart';
 import 'package:future_world_corn_mobile/theme/app_theme.dart';
 
@@ -43,6 +44,14 @@ class MorePage extends StatelessWidget {
             title: '创建市场',
             subtitle: 'Owner 或 marketCreator 地址可创建预测市场',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMarketPage())),
+          ),
+          const SizedBox(height: 12),
+          _EntryCard(
+            icon: Icons.admin_panel_settings,
+            iconColor: AppTheme.yes,
+            title: '创建权限管理',
+            subtitle: 'Owner 授权/撤销谁能创建市场',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PermissionPage())),
           ),
           const SizedBox(height: 12),
           _EntryCard(

@@ -382,6 +382,11 @@ class ContractService {
     return _readBool(rpcUrl, addr.predictionMarketAddress, '0x1d6c8bc8${_addrPad(userAddress)}');
   }
 
+  static String setMarketCreatorData(String creatorAddress, bool active) {
+    return '0xd036d124${_addrPad(creatorAddress)}'
+        '${active ? '0000000000000000000000000000000000000000000000000000000000000001' : '0000000000000000000000000000000000000000000000000000000000000000'}';
+  }
+
   static String createMarketData(String question, int deadline, int feeBps) {
     final qBytes = utf8.encode(question);
     final qLen = qBytes.length;

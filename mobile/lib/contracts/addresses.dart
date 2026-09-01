@@ -31,6 +31,7 @@ const List<dynamic> predictionMarketAbi = [
   'function feeCollector() view returns (address)',
   'function resolvers(address) view returns (bool)',
   'function marketCreators(address) view returns (bool)',
+  'function marketCreators(address) view returns (bool)',
   'function owner() view returns (address)',
 ];
 

@@ -87,7 +87,7 @@ class ContractService {
   }
 
   static Future<int> defaultFeeBps(String rpcUrl) async {
-    final val = await _readUint(rpcUrl, addr.predictionMarketAddress, '0x2e56409e');
+    final val = await _readUint(rpcUrl, addr.predictionMarketAddress, '0xbcae25a4');
     return val.toInt();
   }
 

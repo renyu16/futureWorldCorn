@@ -171,6 +171,18 @@ contract PredictionMarket is
         defaultFeeBps = _feeBps;
     }
 
+    /// @notice Purge markets above `newCount` and rewind the counter (onlyOwner).
+    ///         Intended for cleaning up orphaned/placeholder markets so ids can be reused.
+    ///         Note: per-address share/claim mappings cannot be enumerated, so only the
+    ///         market structs are cleared. This is safe for markets with no outstanding bets.
+    function resetMarketCount(uint256 newCount) external onlyOwner {
+        require(newCount < marketCount, "cannot increase");
+        for (uint256 i = newCount + 1; i <= marketCount; i++) {
+            delete markets[i];
+        }
+        marketCount = newCount;
+    }
+
     function setFeeCollector(address _feeCollector) external onlyOwner {
         feeCollector = _feeCollector;
     }

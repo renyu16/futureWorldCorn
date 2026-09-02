@@ -209,4 +209,99 @@ contract PredictionMarketTest is Test {
         pm.setMarketCreator(alice, true);
         assertFalse(pm.marketCreators(alice));
     }
+
+    // ======== resetMarketCount (admin purge) ========
+
+    function _threeMarkets() internal {
+        pm.createMarket(QUESTION, DEADLINE, 200);         // id 1
+        pm.createMarket("Q2", DEADLINE, 200);             // id 2
+        pm.createMarket("Q3", DEADLINE, 200);             // id 3
+    }
+
+    function test_ResetMarketCountToZeroPurgesStructs() public {
+        _threeMarkets();
+        assertEq(pm.marketCount(), 3);
+
+        pm.resetMarketCount(0);
+
+        assertEq(pm.marketCount(), 0);
+        (string memory q,,,,,,) = pm.markets(1);
+        assertEq(q, "");
+        (string memory q2,,,,,,) = pm.markets(3);
+        assertEq(q2, "");
+    }
+
+    function test_ResetMarketCountToZeroAllowsRebuildFromId1() public {
+        _threeMarkets();
+        pm.resetMarketCount(0);
+
+        pm.createMarket(QUESTION, DEADLINE, 200);
+        assertEq(pm.marketCount(), 1);
+
+        (string memory q,,,,, bool result,) = pm.markets(1);
+        assertEq(q, QUESTION);
+        assertEq(pm.marketCount(), 1);
+        assertEq(result, false);
+    }
+
+    function test_ResetMarketCountPartial() public {
+        _threeMarkets();
+        // remove only market 3
+        pm.resetMarketCount(2);
+        assertEq(pm.marketCount(), 2);
+
+        (string memory q1,,,,,,) = pm.markets(1);
+        assertEq(q1, QUESTION);
+        (string memory q3,,,,,,) = pm.markets(3);
+        assertEq(q3, "");
+
+        // reuse id 3
+        pm.createMarket("Q3new", DEADLINE, 200);
+        assertEq(pm.marketCount(), 3);
+        (string memory q3new,,,,,,) = pm.markets(3);
+        assertEq(q3new, "Q3new");
+    }
+
+    function test_ResetMarketCountClearsStructTotals() public {
+        uint256 id = _createMarket();
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        (, uint128 outcomeYes,,,,,) = pm.markets(id);
+        assertEq(outcomeYes, 1000);
+
+        pm.resetMarketCount(0);
+
+        // struct totals cleared with the market struct
+        (, uint128 oy,,,,,) = pm.markets(id);
+        assertEq(oy, 0);
+        assertEq(pm.marketCount(), 0);
+    }
+
+    function test_ReusedIdGetsFreshStruct() public {
+        uint256 id = _createMarket();
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        pm.resetMarketCount(0);
+
+        pm.createMarket("Fresh", DEADLINE, 200);
+        assertEq(pm.marketCount(), 1);
+        (string memory q, uint128 oy,,,,,) = pm.markets(1);
+        assertEq(q, "Fresh");
+        assertEq(oy, 0);
+    }
+
+    function test_ResetMarketCountOnlyOwner() public {
+        _threeMarkets();
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, bob));
+        pm.resetMarketCount(0);
+    }
+
+    function test_ResetMarketCountCannotIncrease() public {
+        _threeMarkets();
+        vm.expectRevert("cannot increase");
+        pm.resetMarketCount(5);
+    }
 }

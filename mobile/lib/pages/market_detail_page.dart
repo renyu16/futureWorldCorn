@@ -7,6 +7,7 @@ import 'package:future_world_corn_mobile/providers/market_provider.dart';
 import 'package:future_world_corn_mobile/providers/wallet_provider.dart';
 import 'package:future_world_corn_mobile/providers/rpc_provider.dart';
 import 'package:future_world_corn_mobile/services/contract_service.dart';
+import 'package:future_world_corn_mobile/services/walletconnect_service.dart';
 import 'package:future_world_corn_mobile/services/price_history_service.dart';
 import 'package:future_world_corn_mobile/services/dispute_service.dart';
 import 'package:future_world_corn_mobile/services/news_service.dart';
@@ -803,15 +804,65 @@ class _TradingPanelState extends ConsumerState<_TradingPanel> {
 
     setState(() => _pending = true);
 
-    if (_needsApproval) {
-      final data = ContractService.approveData(addr.predictionMarketAddress, BigInt.from((_amount * 1e18).toInt()));
-      _showRawTx('授权 CORN', addr.cornTokenAddress, data);
-    } else {
-      final data = ContractService.betData(widget.market.id, _betYes ? 0 : 1, BigInt.from((_amount * 1e18).toInt()));
-      _showRawTx('下注 ${_betYes ? "YES" : "NO"}', addr.predictionMarketAddress, data);
-    }
+    final amountWei = _parseAmountToWei(_amountController.text);
+    try {
+      if (_needsApproval) {
+        final approveData = ContractService.approveData(addr.predictionMarketAddress, amountWei);
+        final approveHash = await WalletConnectService.sendEthTransaction(
+          to: addr.cornTokenAddress,
+          data: approveData,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('授权已广播：$approveHash'),
+            backgroundColor: AppTheme.yes,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        // 等待授权上链后刷新 allowance
+        await Future.delayed(const Duration(seconds: 2));
+      }
 
-    setState(() => _pending = false);
+      final betData = ContractService.betData(widget.market.id, _betYes ? 0 : 1, amountWei);
+      final betHash = await WalletConnectService.sendEthTransaction(
+        to: addr.predictionMarketAddress,
+        data: betData,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('下注成功：$betHash'),
+          backgroundColor: AppTheme.yes,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      widget.onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      final reason = e is String ? e : e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('交易广播失败：$reason\n已显示手动广播弹窗', maxLines: 3)),
+      );
+      final rawData = _needsApproval
+          ? ContractService.approveData(addr.predictionMarketAddress, amountWei)
+          : ContractService.betData(widget.market.id, _betYes ? 0 : 1, amountWei);
+      _showRawTx(_needsApproval ? '授权 CORN' : '下注 ${_betYes ? "YES" : "NO"}',
+          _needsApproval ? addr.cornTokenAddress : addr.predictionMarketAddress, rawData);
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  BigInt _parseAmountToWei(String text) {
+    final s = text.trim();
+    if (s.isEmpty) return BigInt.zero;
+    final parts = s.split('.');
+    final intPart = parts[0].isEmpty ? '0' : parts[0];
+    String frac = parts.length > 1 ? parts[1] : '';
+    if (frac.length > 18) frac = frac.substring(0, 18);
+    frac = (frac + '0' * (18 - frac.length));
+    return BigInt.parse(intPart) * BigInt.from(10).pow(18) + BigInt.parse(frac.isEmpty ? '0' : frac);
   }
 
   void _showRawTx(String title, String to, String data) {

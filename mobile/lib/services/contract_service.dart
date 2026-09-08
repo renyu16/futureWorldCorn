@@ -343,15 +343,15 @@ class ContractService {
   }
 
   static String betData(int marketId, int outcome, BigInt amount) {
-    return '0xd53d1794${_uintPadInt(marketId)}${outcome.toRadixString(16).padLeft(64, '0')}${_uintPad(amount)}';
+    return '0xcf87935c${_uintPadInt(marketId)}${outcome.toRadixString(16).padLeft(64, '0')}${_uintPad(amount)}';
   }
 
   static String claimRewardData(int marketId) {
-    return '0x367bbd2c${_uintPadInt(marketId)}';
+    return '0xae169a50${_uintPadInt(marketId)}';
   }
 
   static String resolveMarketData(int marketId, bool result) {
-    return '0x8b4e8f54${_uintPadInt(marketId)}${result ? '0000000000000000000000000000000000000000000000000000000000000001' : '0000000000000000000000000000000000000000000000000000000000000000'}';
+    return '0x57bde446${_uintPadInt(marketId)}${result ? '0000000000000000000000000000000000000000000000000000000000000001' : '0000000000000000000000000000000000000000000000000000000000000000'}';
   }
 
   static String raiseDisputeData(int marketId, int disputeType, String reason) {

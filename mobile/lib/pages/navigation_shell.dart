@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:future_world_corn_mobile/theme/app_theme.dart';
 import 'package:future_world_corn_mobile/pages/home_page.dart';
 import 'package:future_world_corn_mobile/pages/portfolio_page.dart';
 import 'package:future_world_corn_mobile/pages/governance_page.dart';
 import 'package:future_world_corn_mobile/pages/more_page.dart';
+import 'package:future_world_corn_mobile/services/walletconnect_service.dart';
+import 'package:future_world_corn_mobile/providers/walletconnect_provider.dart';
 
-class NavigationShell extends StatefulWidget {
+class NavigationShell extends ConsumerStatefulWidget {
   const NavigationShell({super.key});
 
   @override
-  State<NavigationShell> createState() => _NavigationShellState();
+  ConsumerState<NavigationShell> createState() => _NavigationShellState();
 }
 
-class _NavigationShellState extends State<NavigationShell> {
+class _NavigationShellState extends ConsumerState<NavigationShell> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await WalletConnectService.initialize(context);
+      ref.read(wcSessionProvider);
+    });
+  }
 
   static const _pages = <Widget>[
     HomePage(),

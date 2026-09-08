@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/rpc_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../providers/walletconnect_provider.dart';
+import '../services/walletconnect_service.dart';
 import '../contracts/addresses.dart' as addr;
 import '../theme/app_theme.dart';
 
@@ -221,6 +223,7 @@ class _WalletSection extends ConsumerStatefulWidget {
 
 class _WalletSectionState extends ConsumerState<_WalletSection> {
   late TextEditingController _controller;
+  bool _connecting = false;
 
   @override
   void initState() {
@@ -235,10 +238,46 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
     super.dispose();
   }
 
+  Future<void> _connectWallet() async {
+    if (!WalletConnectService.isInitialized) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('WalletConnect 尚未就绪，请稍后重试')),
+        );
+      }
+      return;
+    }
+    setState(() => _connecting = true);
+    try {
+      await WalletConnectService.connect();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('连接钱包失败')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _connecting = false);
+      ref.read(wcSessionProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _disconnectWallet() async {
+    await WalletConnectService.disconnect();
+    ref.read(wcSessionProvider.notifier).refresh();
+    _controller.clear();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已断开')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final wc = ref.watch(wcSessionProvider);
     final wallet = ref.watch(walletProvider);
-    final connected = wallet.connected;
+    final wcConnected = wc.connected;
 
     return Card(
       child: Padding(
@@ -248,59 +287,100 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
           children: [
             Row(children: [
               Icon(Icons.account_balance_wallet, size: 16,
-                color: connected ? AppTheme.yes : AppTheme.muted),
+                color: wcConnected ? AppTheme.yes : AppTheme.muted),
               const SizedBox(width: 6),
-              Text(connected ? '已连接钱包' : '钱包地址',
+              Text(wcConnected ? '已连接钱包（WalletConnect）' : '连接钱包',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 8),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: '0x...  输入你的钱包地址',
+
+            // WalletConnect 连接按钮 / 状态
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: wcConnected ? null : _connectWallet,
+                icon: _connecting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.wallet, size: 18),
+                label: Text(wcConnected ? '已连接' : '连接钱包 (WalletConnect)'),
               ),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(walletProvider.notifier).setAddress(_controller.text);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('钱包地址已保存')),
-                    );
-                  },
-                  child: const Text('保存'),
-                ),
-              ),
-              if (connected) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      ref.read(walletProvider.notifier).disconnect();
-                      _controller.clear();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已断开')),
-                      );
-                    },
-                    child: const Text('断开'),
-                  ),
-                ),
-              ],
-            ]),
-            if (connected) ...[
+            if (wcConnected) ...[
               const SizedBox(height: 8),
               Row(children: [
                 Icon(Icons.check_circle, size: 14, color: AppTheme.yes),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(wallet.address!,
+                  child: Text(wc.address ?? wallet.address ?? '',
                     style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppTheme.muted),
                     overflow: TextOverflow.ellipsis),
                 ),
               ]),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _disconnectWallet,
+                  child: const Text('断开连接'),
+                ),
+              ),
+            ],
+
+            if (!wcConnected) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Text('或手动填写钱包地址（仅用于只读展示，无签名能力）',
+                style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  hintText: '0x...  输入你的钱包地址',
+                ),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ref.read(walletProvider.notifier).setAddress(_controller.text);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('钱包地址已保存')),
+                      );
+                    },
+                    child: const Text('保存'),
+                  ),
+                ),
+                if (wallet.connected) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        ref.read(walletProvider.notifier).disconnect();
+                        _controller.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已清除')),
+                        );
+                      },
+                      child: const Text('清除'),
+                    ),
+                  ),
+                ],
+              ]),
+              if (wallet.connected) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(Icons.check_circle, size: 14, color: AppTheme.yes),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(wallet.address!,
+                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppTheme.muted),
+                      overflow: TextOverflow.ellipsis),
+                  ),
+                ]),
+              ],
             ],
           ],
         ),

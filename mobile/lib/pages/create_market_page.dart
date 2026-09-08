@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:future_world_corn_mobile/providers/wallet_provider.dart';
+import 'package:future_world_corn_mobile/providers/walletconnect_provider.dart';
 import 'package:future_world_corn_mobile/providers/rpc_provider.dart';
 import 'package:future_world_corn_mobile/services/contract_service.dart';
+import 'package:future_world_corn_mobile/services/walletconnect_service.dart';
 import 'package:future_world_corn_mobile/contracts/addresses.dart' as addr;
 import 'package:future_world_corn_mobile/theme/app_theme.dart';
 
@@ -24,6 +26,7 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
   bool _isOwner = false;
   bool _isCreator = false;
   int _defaultFee = 200;
+  bool _sending = false;
   String? _error;
 
   @override
@@ -137,7 +140,33 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
     );
   }
 
-  void _handleCreate() {
+  Future<void> _submitTransaction(String to, String data) async {
+    if (_sending) return;
+    setState(() => _sending = true);
+    try {
+      final hash = await WalletConnectService.sendEthTransaction(to: to, data: data);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('交易已广播：$hash'),
+          backgroundColor: AppTheme.yes,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // 广播失败，退回报错 / 兜底复制弹窗
+      final reason = e is String ? e : e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('交易广播失败：$reason\n已显示手动广播弹窗', maxLines: 3)),
+      );
+      _showRawTx(to, data);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _handleCreate() async {
     if (!_isOwner && !_isCreator) return;
 
     final question = _questionCtrl.text.trim();
@@ -172,12 +201,18 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
     }
 
     final data = ContractService.createMarketData(question, deadlineUnix, feeBps);
-    _showRawTx(addr.predictionMarketAddress, data);
+    await _submitTransaction(addr.predictionMarketAddress, data);
   }
 
   @override
   Widget build(BuildContext context) {
-    final wallet = ref.watch(walletProvider);
+    final wc = ref.watch(wcSessionProvider);
+
+    ref.listen<WcSessionState>(wcSessionProvider, (prev, next) {
+      if (next.connected && (prev == null || !prev.connected)) {
+        _loadPermission();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -304,10 +339,18 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: wallet.connected ? _handleCreate : null,
-                      child: const Text('构造交易'),
+                      onPressed: (wc.connected && !_sending) ? _handleCreate : null,
+                      child: _sending
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('签署并广播'),
                     ),
                   ),
+                  if (!wc.connected)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('请先在设置中通过 WalletConnect 连接钱包。',
+                          style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+                    ),
                 ],
               ),
             ),

@@ -50,5 +50,22 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- WalletConnect 深链唤起：MetaMask 等钱包的自定义 scheme（Android 11+ 包可见性） -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="metamask"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="wc"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="trust"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="rainbow"/>
+        </intent>
     </queries>
 </manifest>

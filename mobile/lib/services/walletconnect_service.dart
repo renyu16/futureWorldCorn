@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:reown_appkit/reown_appkit.dart';
 import '../contracts/addresses.dart' as addr;
@@ -24,12 +26,31 @@ class WalletConnectService {
       context: context,
       projectId: WcConfig.projectId,
       metadata: WcConfig.pairingMetadata,
-      logLevel: LogLevel.info,
+      logLevel: LogLevel.debug,
       disconnectOnDispose: false,
       customWallets: WcConfig.customWallets,
     );
+    modal.onModalError.subscribe((e) {
+      debugPrint('[wcinst] onModalError: $e');
+    });
     _appKit = modal;
-    await modal.init();
+    try {
+      modal.appKit?.core.addLogListener((msg) {
+        debugPrint('[wcore] $msg');
+      });
+      debugPrint('[wcinst] log listener attached');
+    } catch (e, s) {
+      debugPrint('[wcinst] addLogListener failed: $e $s');
+    }
+    final initDone = await modal.init().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        debugPrint('[wcinst] modal.init() TIMED OUT after 20s');
+        return;
+      },
+    );
+    debugPrint('[wcinst] modal.init() returned');
+    debugPrint('[wcinst] initialized; relayUrl=${modal.appKit?.core.relayUrl}');
   }
 
   static bool get isConnected => _appKit?.isConnected ?? false;
@@ -89,7 +110,38 @@ class WalletConnectService {
   /// 发起连接（打开 AppKit 内置选择钱包弹窗）
   static Future<void> connect() async {
     final modal = _effective();
+    _watchWcUri(modal);
     await modal.openModalView();
+  }
+
+  /// 诊断辅助：轮询打印连接期间生成的 wcUri（release 也走 debugPrint 到 logcat）
+  static void _watchWcUri(ReownAppKitModal modal) {
+    debugPrint('[wcup] watch start');
+    var last = '';
+    var count = 0;
+    Timer.periodic(const Duration(milliseconds: 800), (t) {
+      final uri = modal.wcUri ?? '';
+      if (uri != last) {
+        count = 0;
+        debugPrint('[wcup] uri = $uri');
+        debugPrint('[wcup] key  = ${modal.session?.peer?.metadata?.name}');
+        last = uri;
+      } else if (uri.isNotEmpty) {
+        count++;
+      }
+      if (modal.isConnected && modal.session != null) {
+        debugPrint('[wcup] session established topic=${modal.session?.topic}');
+        t.cancel();
+      }
+      if (uri.isNotEmpty && count > 120) {
+        debugPrint('[wcup] stop (uri held, no session)');
+        t.cancel();
+      }
+      if (modal.isOpen == false && uri.isEmpty) {
+        debugPrint('[wcup] modal closed without uri');
+        t.cancel();
+      }
+    });
   }
 
   static Future<void> disconnect() async {

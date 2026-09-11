@@ -1,151 +1,218 @@
-# HumanHouse 争议机制改进方案
+# 争议处理完整方案
 
-## 当前已知问题
+## 设计决策
 
-| 问题 | 现状 | 风险等级 |
-|------|------|----------|
-| 抵押金额固定 | `disputeDeposit` 全市场统一，owner 可调 | P2 |
-| 投票权重相同 | 1票=1票，大户小户权重一样 | P3 |
-| 翻转结果无冻结期 | 结算后立即 claim，存在抢跑激励 | P1 |
-| 投票期固定 5 天 | 所有争议统一 5 天 | P4 |
-| World ID 尚未真实集成 | mock 零值证明，可重复刷票 | P0 |
-
-## 设计决策：放弃追回已领取奖励
-
-对标 Polymarket / Augur / Kalshi / Kleros 各平台，**没有任何平台在结算后追回已领取的奖励**，结果均不可逆。追回机制（债务账本、余额扣除）链上无法强制、复杂度高、会伤害正常用户，且 Polymarket 已用实践验证"系统按设计运行=不退款"。
-
-**因此：不从用户钱包追回，改为在结算后设置冻结窗口，把争议前置到领取之前。**
+- **放弃追回已领取奖励**：Polymarket / Augur / Kalshi / Kleros 均不追回，行业共识
+- **前置冻结窗口**：结算后 24h 冻结 Claim，争议在领取前解决
+- **消灭争议优先**：市场创建时强制写清结算规则，从源头消灭争议
+- **分级处理**：低争议快速通过，高争议升级仲裁
 
 ---
 
-## 改进方案
+## 当前合约漏洞
 
-### P0：World ID 真实集成
-
-**问题**：当前 `vote()` 传 mock 零值证明，任何人都能重复投票，去中心化程度存疑。
-
-**方案**：前端集成 `@worldcoin/idkit` 生成真实证明。
-
-- 前端调用 `@worldcoin/idkit` 的 `verify()` 生成真实 proof/root/nullifierHash
-- 合约已实现 `verifyProof()` 逻辑（`HumanHouse.sol:105-112`），只是当前 mock
-- 需要配置真实 `WORLD_ID_APP_ID` 和 `WORLD_ID_ROUTER_ADDRESS`
-- 依赖：`npm install @worldcoin/idkit`（当前 `package.json` 无此依赖）
-- Router 地址：部署脚本已有 `WORLD_ID_ROUTER_ADDRESS` 环境变量（`.env.example:21`）
-
-**工作量**：前端 1-2 天 + 合约已就绪
+| 漏洞 | 影响 | 修复 |
+|------|------|------|
+| `disputeResolve` 无防重复调用 | resolver 可无限次翻转 result | 加 disputeCount/disputeLocked |
+| Market 无数据源字段 | 争议时无法证明对错 | Market 结构体加 resolutionSource |
+| `disputeResolve` 要求 Resolved 状态 | 设计合理（需先结算再争议） | 保持 |
 
 ---
 
-### P1：Claim 冻结窗口（防抢跑）
+## 分层方案
 
-**问题**：`disputeResolve` 只翻转结果，已通过 `claimReward` 领走的 CORN 不退回。先领的人无风险，后领的人受损，存在抢跑激励。
+### 层级一：消灭争议（Kalshi 模式）
 
-**行业共识**：Polymarket / Augur / Kalshi 均不追回已领取奖励，结果终局不可逆。追回机制（债务账本/扣余额）复杂度高、链上无法强制、还会伤害正常用户。**决策：放弃追回，改为前置冻结窗口。**
+**原理**：有明确数据源的市场，争议率趋零。
 
-**方案**：结算后的挑战期内冻结 Claim，无争议则正常解冻。
+**实现**：Market 结构体新增字段
+
+```solidity
+struct Market {
+    string question;
+    uint128 outcomeYes;
+    uint128 outcomeNo;
+    uint40 deadline;
+    MarketStatus status;
+    bool result;
+    uint16 feeBps;
+    string resolutionSource;  // 新增：结算数据源
+    string resolutionRule;    // 新增：首版/官方/社区共识
+    string edgeCase;          // 新增：特殊情况处理
+}
+```
+
+- `resolutionSource`：数据来源（"Chainlink Feed 0x..." / "BLS CPI" / "CoinGecko" / "社区共识"）
+- `resolutionRule`：结算规则（"首版数据为准" / "官方公告为准" / "社区投票"）
+- `edgeCase`：边缘情况处理（"数据延迟→按延迟版本" / "50-50各返50%"）
+
+**前端改动**：创建市场页面增加三个字段（可选，不填则为社区共识市场）。
+
+---
+
+### 层级二：冻结窗口（Polymarket 模式）
+
+**原理**：结算后 24h 冻结，无人争议则终局，有人争议则进入投票。
 
 ```
 市场结算（resolveMarket）
-  → 进入挑战期（如 24h），claimFrozen[marketId] = true
-  → 所有人无法 claimReward
+  → claimFrozen[marketId] = true
+  → disputeDeadline[marketId] = now + 24h
 
 挑战期内：
+  无人 raiseDispute → 窗口结束 → claimFrozen = false → 正常 claim
+  有人 raiseDispute → 进入投票 → 翻转或否决 → 解冻
 
-  无人 raiseDispute
-    → 挑战期结束，claimFrozen = false
-    → 用户正常 claim，结果终局
-
-有人 raiseDispute
-    → 进入 HumanHouse 投票（World ID 一人一票）
-    → 投票通过 → 翻转结果 → 解冻 → 按新结果 claim
-    → 投票否决 → 解冻 → 按原结果 claim
-
-已领取的（历史结算时代的少数情况）：不追回
+已领取的：不追回（行业共识）
 ```
 
-**需要改动**：
-- PredictionMarket 新增 `claimFrozen` 映射（`mapping(uint256 => bool)`）
-- `claimReward()` 检查冻结状态，冻结期间 revert
-- `resolveMarket()` 结算时自动进入冻结期，计时器到期后自动解冻（或 HumanHouse 调用解冻）
-- 可选：OracleAdapter 结算同样先冻结，留给争议窗口
+**实现**：
 
-**收益**：
-- 彻底消除抢跑（争议期内领不走）
-- 不惩罚正常用户（无债务、无扣款）
-- 复杂度低（仅一个冻结开关 + 计时器）
-- 符合主流平台行为（Polymarket 2h 挑战期即为此模式）
+```solidity
+// PredictionMarket 新增
+mapping(uint256 => bool) public claimFrozen;
+mapping(uint256 => uint256) public disputeDeadline;
+uint256 public constant DISPUTE_WINDOW = 24 hours;
 
-**权衡**：结算后用户要等冻结期才能领，增加 24h 延迟。Polymarket 同样有 2h 挑战期，用户已习惯。
+// resolveMarket 改动：结算时自动冻结
+function resolveMarket(uint256 marketId, bool result) external {
+    // ... 原有逻辑
+    m.status = MarketStatus.Resolved;
+    m.result = result;
+    claimFrozen[marketId] = true;
+    disputeDeadline[marketId] = block.timestamp + DISPUTE_WINDOW;
+}
 
-**工作量**：合约 1-2 天 + 前端适配
+// claimReward 改动：检查冻结
+function claimReward(uint256 marketId) external nonReentrant {
+    require(!claimFrozen[marketId], "claims frozen");
+    // ... 原有逻辑
+}
+
+// HumanHouse 解冻
+function unfreezeMarket(uint256 marketId) external {
+    PredictionMarket(predictionMarket).unfreezeClaims(marketId);
+}
+```
+
+**HumanHouse 改动**：
+- `executeDispute` 通过后调用 `unfreezeClaims(marketId)`
+- 无争议自动解冻需链下 bot 或预言机自动触发
 
 ---
 
-### P2：按市场资金动态抵押
+### 层级三：动态抵押（防垃圾争议）
 
-**问题**：`disputeDeposit` 全市场统一，大市场抵押太小容易被滥用，小市场抵押太高没有门槛意义。
-
-**方案**：按市场总下注额动态计算。
+**原理**：按市场资金规模动态调整抵押，大市场高门槛，小市场低门槛。
 
 ```
 disputeDeposit = max(baseDeposit, marketPool * disputeRatio / 10000)
 ```
 
-- `baseDeposit`（owner 可调）：最低抵押，防止零抵押垃圾争议
-- `marketPool`：该市场总下注额（`outcomeYes + outcomeNo`）
-- `disputeRatio`：比例系数，如 500（5%），owner 可调
-- 所有参数 owner 可通过 `setDisputeDeposit()` 等函数调整
+- `baseDeposit`：最低抵押（owner 可调，如 100 CORN）
+- `marketPool`：市场总下注额（`outcomeYes + outcomeNo`）
+- `disputeRatio`：比例系数（如 500 = 5%，owner 可调）
 
-**需要改动**：
-- HumanHouse 新增 `disputeRatio` 参数
-- `raiseDispute()` 计算动态抵押（需 eth_call 读取 PredictionMarket 的 market 数据）
-- 或 PredictionMarket 新增 `getDisputeDeposit(marketId)` view 函数供 HumanHouse 调用
+**实现**：
 
-**工作量**：合约 1 天
+```solidity
+// HumanHouse 新增
+uint256 public baseDeposit;
+uint256 public disputeRatio = 500; // 5%
+
+function getDisputeDeposit(uint256 marketId) public view returns (uint256) {
+    (,uint128 outcomeYes, uint128 outcomeNo,,) = IPredictionMarket(predictionMarket).markets(marketId);
+    uint256 pool = uint256(outcomeYes) + uint256(outcomeNo);
+    uint256 dynamic = pool * disputeRatio / 10000;
+    return dynamic > baseDeposit ? dynamic : baseDeposit;
+}
+
+function raiseDispute(...) external {
+    uint256 deposit = getDisputeDeposit(marketId);
+    cornToken.safeTransferFrom(msg.sender, address(this), deposit);
+    // ...
+}
+```
 
 ---
 
-### P3：投票权重加权
+### 层级四：World ID 真实集成
 
-**问题**：1票=1票，持币大户没有动力参与投票，小户可能被贿赂收买。
+**原理**：抗 Sybil，保证一人一票。
 
-**方案**：按持仓加权投票（平方根函数）。
+**实现**：
+- 前端调用 `@worldcoin/idkit` 的 `verify()` 生成 proof
+- 合约已有 `verifyProof()` 逻辑（`HumanHouse.sol:105-112`）
+- 配置真实 `WORLD_ID_APP_ID` 和 `WORLD_ID_ROUTER_ADDRESS`
+
+**依赖**：`npm install @worldcoin/idkit`（前端）
+
+---
+
+### 层级五：投票权重加权（可选迭代）
+
+**原理**：持仓越大，投票权重越大，但用平方根函数防巨鲸。
 
 ```
 voteWeight = sqrt(userCORNBalance + userGovCORNBalance)
 ```
 
-- 用平方根函数（Vitalik 推荐的平方根投票，防巨鲸垄断）
-- `votesFor` / `votesAgainst` 类型从 `uint256` 改为支持小数（如 `uint256` 乘以 1e18）
-- 需要 World ID 验证（防同一人多地址刷票）—— 依赖 P0
-
-**需要改动**：
-- HumanHouse `vote()` 读取 CORN/govCORN 余额
-- `votesFor`/`votesAgainst` 计算改为加权
-- 前端显示投票权重
-
-**工作量**：合约 1 天 + 前端适配
+**实现**：
+- `votesFor`/`votesAgainst` 改为 `uint256`（乘以 1e18 表示精度）
+- `vote()` 读取 CORN/govCORN 余额
+- 需 World ID 验证（依赖层级四）
 
 ---
 
-### P4：投票期分级
+### 层级六：Kleros 仲裁嵌入（可选高价值市场）
 
-**问题**：`votingPeriod = 5 days`，所有争议统一，简单事实争议拖太久，复杂争议时间不够。
+**原理**：重大争议升级到去中心化陪审团。
 
-**方案**：按争议类型设置不同投票期。
+**升级路径**：
+```
+一次投票票数接近（如差距 < 10%）→ 升级到 Kleros
+→ 创建 Kleros Case（提交市场规则 + 双方证据）
+→ 随机抽选陪审员（质押 + 奖励）
+→ 陪审员投票裁决（最终，不可逆）
+```
+
+**实现**：调用 Kleros `createCase` 合约（独立协议，无需自建）
+
+---
+
+## 完整流程
 
 ```
-OracleResult（技术争议） → 3 天（快决断）
-MarketContent（规则争议） → 7 天（充分讨论）
+创建市场
+  ├─ question + deadline + feeBps（已有）
+  ├─ resolutionSource（新增：结算数据源）
+  ├─ resolutionRule（新增：首版/官方/社区共识）
+  └─ edgeCase（新增：特殊情况）
+  │
+  ▼
+下注阶段
+  │
+  ▼
+deadline 到 → resolveMarket()
+  │
+  ▼
+冻结窗口（24h）
+  │
+  ├─ 无争议 → 窗口结束 → 冻结解除 → 正常 claim
+  │
+  └─ 有争议 → raiseDispute()（交动态抵押）
+      │
+      ▼
+    World ID 一人一票投票（5天）
+      │
+      ├─ 通过 → disputeResolve（翻转）→ 解冻 → 按新结果 claim
+      │
+      ├─ 否决 → 解冻 → 按原结果 claim
+      │
+      └─ 票数接近 / 高争议金额 → 升级到 Kleros 仲裁（可选）
+      │
+      └─ 争议次数达上限 → disputeLocked，结果终局
 ```
-
-或更激进：大额争议延长投票期（如 marketPool > 10万 CORN → 7天），小额争议缩短（<1000 CORN → 3天）。
-
-**需要改动**：
-- HumanHouse 新增 `oracleVotingPeriod` 和 `contentVotingPeriod` 参数
-- `raiseDispute()` 根据类型设置不同 deadline
-
-**工作量**：合约 0.5 天
 
 ---
 
@@ -153,11 +220,14 @@ MarketContent（规则争议） → 7 天（充分讨论）
 
 | 阶段 | 内容 | 工作量 | 依赖 |
 |------|------|--------|------|
-| Phase 1 | P0：World ID 真实集成 | 1-2 天 | @worldcoin/idkit |
-| Phase 1 | P1：翻转后追回机制 | 2-3 天 | — |
-| Phase 2 | P2：动态抵押 | 1 天 | — |
-| Phase 2 | P4：投票期分级 | 0.5 天 | — |
-| Phase 3 | P3：投票权重加权 | 1 天 | P0（World ID） |
+| Phase 1 | 修复 disputeResolve 重复调用漏洞 | 0.5 天 | — |
+| Phase 1 | Market 结构体加数据源字段 | 1 天 | — |
+| Phase 1 | 冻结窗口（claimFrozen + disputeDeadline） | 1 天 | — |
+| Phase 2 | 动态抵押 | 1 天 | — |
+| Phase 2 | 投票期分级（OracleResult 3天 / MarketContent 7天） | 0.5 天 | — |
+| Phase 3 | World ID 真实集成 | 1-2 天 | @worldcoin/idkit |
+| Phase 4 | 投票权重加权 | 1 天 | Phase 3 |
+| Phase 5 | Kleros 仲裁嵌入 | 2-3 天 | — |
 
-**Phase 1 是上链前必须解决的**（P0 保证投票去中心化，P1 保证资金安全）。
-**Phase 2-3 可以迭代**，不影响核心功能。
+**Phase 1（2.5天）是合约重构时必须做的**：修复漏洞 + 结算规则前置 + 冻结窗口。
+**Phase 2-5 可以迭代**，不影响核心功能。

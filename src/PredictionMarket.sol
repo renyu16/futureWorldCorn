@@ -136,6 +136,21 @@ contract PredictionMarket is
         require(m.status == MarketStatus.Resolved, "not resolved");
         require(!claimed[marketId][msg.sender], "already claimed");
 
+        // 空边获胜（获胜那边无人下注）：没有真正的赢家。
+        // 把另一条真实下注边的资金按份额全额退回，防止单边市场资金锁死。
+        if ((m.result && m.outcomeYes == 0) || (!m.result && m.outcomeNo == 0)) {
+            uint256 refundShares = m.result
+                ? sharesNo[marketId][msg.sender]
+                : sharesYes[marketId][msg.sender];
+            require(refundShares > 0, "no winnings");
+            require(m.outcomeNo > 0 || m.outcomeYes > 0, "no funds to refund");
+
+            claimed[marketId][msg.sender] = true;
+            token.safeTransfer(msg.sender, refundShares);
+            emit RewardClaimed(marketId, msg.sender, refundShares);
+            return;
+        }
+
         uint256 userShares;
         uint256 losingPool;
         uint256 winningPool;

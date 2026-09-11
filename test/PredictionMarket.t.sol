@@ -304,4 +304,129 @@ contract PredictionMarketTest is Test {
         vm.expectRevert("cannot increase");
         pm.resetMarketCount(5);
     }
+
+    // ======== 单边市场结算（修复：空边获胜时退款，不锁死资金）=======
+
+    /// 只有 YES 下注、NO 无人下注，且结果 = NO（空边"赢"）：
+    /// 没有真正的赢家，应全额退回下注者本金，不能锁死在合约里。
+    function test_RefundWhenEmptySideWins_YesOnly() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, false); // NO 赢，但 NO 边无人下注
+
+        uint256 balPre = token.balanceOf(alice);
+        vm.prank(alice);
+        pm.claimReward(id);
+        uint256 balPost = token.balanceOf(alice);
+
+        // 全额退款，无收益
+        assertEq(balPost - balPre, 1000);
+        // 平台不抽取手续费
+        assertEq(token.balanceOf(feeCollector), 0);
+        // 合约内不残留资金
+        assertEq(token.balanceOf(address(pm)), 0);
+    }
+
+    /// 对称：只有 NO 下注、YES 无人下注，且结果 = YES（空边"赢"）。
+    function test_RefundWhenEmptySideWins_NoOnly() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.NO, 750);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, true); // YES 赢，但 YES 边无人下注
+
+        uint256 balPre = token.balanceOf(alice);
+        vm.prank(alice);
+        pm.claimReward(id);
+        uint256 balPost = token.balanceOf(alice);
+
+        assertEq(balPost - balPre, 750);
+        assertEq(token.balanceOf(feeCollector), 0);
+        assertEq(token.balanceOf(address(pm)), 0);
+    }
+
+    /// 单边市场、有下注的一边获胜：下注者拿回本金（无败池可分，无收益）。
+    function test_SingleSide_OwnSideWins_ReturnsPrincipalOnly() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, true); // YES 赢，正是有下注的一边
+
+        uint256 balPre = token.balanceOf(alice);
+        vm.prank(alice);
+        pm.claimReward(id);
+        uint256 balPost = token.balanceOf(alice);
+
+        assertEq(balPost - balPre, 1000); // 本金，无收益
+        assertEq(token.balanceOf(address(pm)), 0);
+    }
+
+    /// 双人分摊时的退款：每人按自己的下注额全额退回。
+    function test_RefundEmptySide_DistributesToAllBettors() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 600);
+        vm.prank(bob);
+        pm.bet(id, PredictionMarket.Outcome.YES, 400);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, false); // NO 空边赢 -> 退款
+
+        uint256 aPre = token.balanceOf(alice);
+        uint256 bPre = token.balanceOf(bob);
+        vm.prank(alice);
+        pm.claimReward(id);
+        vm.prank(bob);
+        pm.claimReward(id);
+        uint256 aPost = token.balanceOf(alice);
+        uint256 bPost = token.balanceOf(bob);
+
+        assertEq(aPost - aPre, 600);
+        assertEq(bPost - bPre, 400);
+        assertEq(token.balanceOf(address(pm)), 0);
+    }
+
+    /// 退款后二次领取应被禁止（claimed 标记生效）。
+    function test_RefundCannotClaimTwice() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, false);
+
+        vm.prank(alice);
+        pm.claimReward(id);
+
+        vm.prank(alice);
+        vm.expectRevert("already claimed");
+        pm.claimReward(id);
+    }
+
+    /// 没有下注的地址在退款场景下不应能领走资金。
+    function test_Refund_NonBettorGetsNothing() public {
+        uint256 id = _createMarket();
+
+        vm.prank(alice);
+        pm.bet(id, PredictionMarket.Outcome.YES, 1000);
+
+        vm.warp(DEADLINE + 1);
+        pm.resolveMarket(id, false);
+
+        address carol = address(0x4);
+        vm.prank(carol);
+        vm.expectRevert("no winnings");
+        pm.claimReward(id);
+    }
 }

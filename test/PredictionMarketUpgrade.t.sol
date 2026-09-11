@@ -43,7 +43,7 @@ contract PredictionMarketUpgradeTest is Test {
     }
 
     function test_ProxyMarketCreation() public {
-        wrapped.createMarket("test?", 1_000_000, 200);
+        wrapped.createMarket("test?", 1_000_000, 200, "", "", "");
         assertEq(wrapped.marketCount(), 1);
     }
 
@@ -63,3 +63,4 @@ contract PredictionMarketUpgradeTest is Test {
         wrapped.upgradeToAndCall(address(implV2), "");
     }
 }
+

@@ -35,7 +35,7 @@ contract HumanHouseTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         market = PredictionMarket(address(proxy));
 
-        market.createMarket("Will ETH reach $10k?", uint40(block.timestamp + 7 days), 0);
+        market.createMarket("Will ETH reach $10k?", uint40(block.timestamp + 7 days), 0, "", "", "");
 
         // Fund alice
         corn.transfer(alice, 10000e18);
@@ -56,6 +56,7 @@ contract HumanHouseTest is Test {
             "app_test",
             "human_house_vote"
         );
+        market.setResolver(address(humanHouse), true);
     }
 
     function test_RaiseDispute() public {
@@ -96,7 +97,7 @@ contract HumanHouseTest is Test {
         assertEq(uint8(state), uint8(HumanHouse.DisputeState.Approved));
         assertEq(aliceBalanceAfter - aliceBalanceBefore, 1000e18);
 
-        (,,,,, bool marketResult,) = market.markets(1);
+        (,,,,, bool marketResult,,,,) = market.markets(1);
         assertTrue(!marketResult); // result flipped from true to false
     }
 
@@ -242,7 +243,7 @@ contract HumanHouseTest is Test {
 
         vm.warp(block.timestamp + 8 days);
         market.resolveMarket(1, true);
-        (,,,,, bool originalResult,) = market.markets(1);
+        (,,,,, bool originalResult,,,,) = market.markets(1);
         assertTrue(originalResult);
 
         vm.startPrank(alice);
@@ -254,7 +255,7 @@ contract HumanHouseTest is Test {
         vm.warp(block.timestamp + 6 days);
         humanHouse.executeDispute(1);
 
-        (,,,,, bool newResult,) = market.markets(1);
+        (,,,,, bool newResult,,,,) = market.markets(1);
         assertTrue(!newResult); // result should be flipped (now false)
     }
 

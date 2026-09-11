@@ -20,14 +20,14 @@ contract BatchSetup is Script {
 
         vm.startBroadcast(deployerKey);
 
-        market.createMarket(unicode"BTC 2026年底能突破15万美元吗？", baseDeadline + 7 days, 200);
-        market.createMarket(unicode"ETH 2026年底能突破1万美元吗？", baseDeadline + 14 days, 200);
-        market.createMarket(unicode"World Chain 2026年TVL能突破10亿美元吗？", baseDeadline + 21 days, 200);
-        market.createMarket(unicode"2026年全球GDP增速能超过3.5%吗？", baseDeadline + 28 days, 200);
-        market.createMarket(unicode"AI 2026年底前能通过图灵测试吗？", baseDeadline + 35 days, 200);
-        market.createMarket(unicode"2026年Solana市值能超过以太坊吗？", baseDeadline + 42 days, 200);
-        market.createMarket(unicode"CornToken 2026年底前市值能进Top 100吗？", baseDeadline + 49 days, 200);
-        market.createMarket(unicode"2026年底全球加密货币用户能突破10亿吗？", baseDeadline + 56 days, 200);
+        market.createMarket(unicode"BTC 2026年底能突破15万美元吗？", baseDeadline + 7 days, 200, unicode"CoinMarketCap 2026-12-31 23:59 UTC 官方收盘价", unicode"YES if BTC USD 收盘价 >= 150000", unicode"数据源失效由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"ETH 2026年底能突破1万美元吗？", baseDeadline + 14 days, 200, unicode"CoinMarketCap 2026-12-31 23:59 UTC 官方收盘价", unicode"YES if ETH USD 收盘价 >= 10000", unicode"数据源失效由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"World Chain 2026年TVL能突破10亿美元吗？", baseDeadline + 21 days, 200, unicode"DefiLlama 2026-12-31 23:59 UTC TVL", unicode"YES if World Chain TVL >= 10亿美元", unicode"TVL 口径以 DefiLlama 为准，争议由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"2026年全球GDP增速能超过3.5%吗？", baseDeadline + 28 days, 200, unicode"IMF《世界经济展望》2027年4月发布数据", unicode"YES if 2026年全球实际GDP增速 > 3.5%", unicode"数据修订以最终发布版为准，争议由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"AI 2026年底前能通过图灵测试吗？", baseDeadline + 35 days, 200, unicode"公开信源（第三方评测/权威媒体报道）", unicode"YES if 有公开可验证的图灵测试通过记录", unicode"判定标准由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"2026年Solana市值能超过以太坊吗？", baseDeadline + 42 days, 200, unicode"CoinMarketCap 2026-12-31 23:59 UTC 市值排名", unicode"YES if SOL 市值 > ETH 市值", unicode"数据源失效由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"CornToken 2026年底前市值能进Top 100吗？", baseDeadline + 49 days, 200, unicode"CoinMarketCap 2026-12-31 23:59 UTC 市值排名", unicode"YES if CORN 市值进入 Top 100", unicode"市值口径以 CoinMarketCap 为准，争议由 HumanHouse 仲裁裁决");
+        market.createMarket(unicode"2026年底全球加密货币用户能突破10亿吗？", baseDeadline + 56 days, 200, unicode"Crypto.com / Triple-A 等第三方报告", unicode"YES if 全球加密用户数 >= 10亿", unicode"口径不一致时由 HumanHouse 仲裁裁决");
 
         IERC20(CORN_TOKEN).approve(GOV_CORN, 10000e18);
         (bool ok, ) = GOV_CORN.call(abi.encodeWithSignature("deposit(uint256)", 10000e18));

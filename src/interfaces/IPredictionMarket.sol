@@ -12,6 +12,9 @@ interface IPredictionMarket {
         uint8 status;
         bool result;
         uint16 feeBps;
+        string resolutionSource;
+        string resolutionRule;
+        string edgeCase;
     }
 
     function markets(uint256 id) external view returns (
@@ -21,10 +24,18 @@ interface IPredictionMarket {
         uint40 deadline,
         uint8 status,
         bool result,
-        uint16 feeBps
+        uint16 feeBps,
+        string memory resolutionSource,
+        string memory resolutionRule,
+        string memory edgeCase
     );
 
     function resolveMarket(uint256 marketId, bool result) external;
 
     function disputeResolve(uint256 marketId, bool result) external;
+
+    function unfreezeClaims(uint256 marketId) external;
+    function freezeClaims(uint256 marketId) external;
+
+    function getMarketPool(uint256 marketId) external view returns (uint256);
 }

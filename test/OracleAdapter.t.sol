@@ -48,7 +48,7 @@ contract OracleAdapterTest is Test {
         pm = PredictionMarket(address(proxy));
         aggregator = new MockAggregator();
 
-        pm.createMarket(QUESTION, DEADLINE, 200);
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");
         marketId = pm.marketCount();
 
         adapter = new OracleAdapter(address(pm), keeper);
@@ -64,7 +64,7 @@ contract OracleAdapterTest is Test {
         vm.prank(keeper);
         adapter.resolveWithFeed(marketId);
 
-        (,,,, PredictionMarket.MarketStatus status, bool result,) = pm.markets(marketId);
+        (,,,, PredictionMarket.MarketStatus status, bool result,,,,) = pm.markets(marketId);
         assertEq(uint8(status), uint8(PredictionMarket.MarketStatus.Resolved));
         assertEq(result, true);
     }
@@ -74,7 +74,7 @@ contract OracleAdapterTest is Test {
         vm.prank(keeper);
         adapter.pushResult(marketId, true);
 
-        (,,,, PredictionMarket.MarketStatus status, bool result,) = pm.markets(marketId);
+        (,,,, PredictionMarket.MarketStatus status, bool result,,,,) = pm.markets(marketId);
         assertEq(uint8(status), uint8(PredictionMarket.MarketStatus.Resolved));
         assertEq(result, true);
     }
@@ -86,3 +86,4 @@ contract OracleAdapterTest is Test {
         adapter.pushResult(marketId, true);
     }
 }
+

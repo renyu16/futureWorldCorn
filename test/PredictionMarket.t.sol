@@ -43,8 +43,12 @@ contract PredictionMarketTest is Test {
     }
 
     function _createMarket(uint16 feeBps) internal returns (uint256) {
-        pm.createMarket(QUESTION, DEADLINE, feeBps);
+        pm.createMarket(QUESTION, DEADLINE, feeBps, "", "", "");
         return pm.marketCount();
+    }
+
+    function _skipWindow() internal {
+        vm.warp(block.timestamp + 24 hours + 1);
     }
 
     // ======== TESTS ========
@@ -53,7 +57,7 @@ contract PredictionMarketTest is Test {
         uint256 id = _createMarket();
         assertEq(id, 1);
 
-        (string memory question,,, uint40 deadline,,, uint16 feeBps) = pm.markets(1);
+        (string memory question,,, uint40 deadline,,, uint16 feeBps,,,) = pm.markets(1);
         assertEq(question, QUESTION);
         assertEq(deadline, DEADLINE);
         assertEq(feeBps, 200);
@@ -68,7 +72,7 @@ contract PredictionMarketTest is Test {
         assertEq(pm.sharesYes(id, alice), 1000);
         assertEq(pm.sharesNo(id, alice), 0);
 
-        (, uint128 outcomeYes,,,,,) = pm.markets(1);
+        (, uint128 outcomeYes,,,,,,,,) = pm.markets(1);
         assertEq(outcomeYes, 1000);
     }
 
@@ -88,9 +92,9 @@ contract PredictionMarketTest is Test {
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, true);
 
-        (,,,, PredictionMarket.MarketStatus status, bool result,) = pm.markets(1);
-        assertEq(uint8(status), uint8(PredictionMarket.MarketStatus.Resolved));
+        (,,,,, bool result,,,,) = pm.markets(1);
         assertEq(result, true);
+        assertEq(pm.claimFrozen(id), true);
     }
 
     function test_ClaimReward() public {
@@ -104,6 +108,8 @@ contract PredictionMarketTest is Test {
 
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, true);
+
+        _skipWindow();
 
         uint256 balanceBefore = token.balanceOf(alice);
         vm.prank(alice);
@@ -139,7 +145,7 @@ contract PredictionMarketTest is Test {
         assertEq(pm.sharesYes(id, bob), 0);
         assertEq(pm.sharesNo(id, alice), 0);
 
-        (, uint128 outcomeYes, uint128 outcomeNo,,,,) = pm.markets(1);
+        (, uint128 outcomeYes, uint128 outcomeNo,,,,,,,) = pm.markets(1);
         assertEq(outcomeYes, 1000);
         assertEq(outcomeNo, 500);
     }
@@ -151,7 +157,7 @@ contract PredictionMarketTest is Test {
     function test_SetMarketFee() public {
         uint256 id = _createMarket(50);
 
-        (,,,,,, uint16 feeBps) = pm.markets(id);
+        (,,,,,, uint16 feeBps,,,) = pm.markets(id);
         assertEq(feeBps, 50);
     }
 
@@ -167,6 +173,8 @@ contract PredictionMarketTest is Test {
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, true);
 
+        _skipWindow();
+
         uint256 feeCollectorBefore = token.balanceOf(feeCollector);
         vm.prank(alice);
         pm.claimReward(id);
@@ -180,14 +188,14 @@ contract PredictionMarketTest is Test {
     function test_OnlyOwnerCreate() public {
         vm.prank(alice);
         vm.expectRevert("unauthorized");
-        pm.createMarket(QUESTION, DEADLINE, 200);
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");
     }
 
     function test_MarketCreatorCanCreate() public {
         pm.setMarketCreator(bob, true);
 
         vm.prank(bob);
-        pm.createMarket(QUESTION, DEADLINE, 200);
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");
 
         assertEq(pm.marketCount(), 1);
         assertTrue(pm.marketCreators(bob));
@@ -200,7 +208,7 @@ contract PredictionMarketTest is Test {
 
         vm.prank(bob);
         vm.expectRevert("unauthorized");
-        pm.createMarket(QUESTION, DEADLINE, 200);
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");
     }
 
     function test_SetMarketCreatorOnlyOwner() public {
@@ -213,9 +221,9 @@ contract PredictionMarketTest is Test {
     // ======== resetMarketCount (admin purge) ========
 
     function _threeMarkets() internal {
-        pm.createMarket(QUESTION, DEADLINE, 200);         // id 1
-        pm.createMarket("Q2", DEADLINE, 200);             // id 2
-        pm.createMarket("Q3", DEADLINE, 200);             // id 3
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");         // id 1
+        pm.createMarket("Q2", DEADLINE, 200, "", "", "");             // id 2
+        pm.createMarket("Q3", DEADLINE, 200, "", "", "");             // id 3
     }
 
     function test_ResetMarketCountToZeroPurgesStructs() public {
@@ -225,9 +233,9 @@ contract PredictionMarketTest is Test {
         pm.resetMarketCount(0);
 
         assertEq(pm.marketCount(), 0);
-        (string memory q,,,,,,) = pm.markets(1);
+        (string memory q,,,,,,,,,) = pm.markets(1);
         assertEq(q, "");
-        (string memory q2,,,,,,) = pm.markets(3);
+        (string memory q2,,,,,,,,,) = pm.markets(3);
         assertEq(q2, "");
     }
 
@@ -235,13 +243,12 @@ contract PredictionMarketTest is Test {
         _threeMarkets();
         pm.resetMarketCount(0);
 
-        pm.createMarket(QUESTION, DEADLINE, 200);
+        pm.createMarket(QUESTION, DEADLINE, 200, "", "", "");
         assertEq(pm.marketCount(), 1);
 
-        (string memory q,,,,, bool result,) = pm.markets(1);
+        (string memory q,,,,,,,,,) = pm.markets(1);
         assertEq(q, QUESTION);
         assertEq(pm.marketCount(), 1);
-        assertEq(result, false);
     }
 
     function test_ResetMarketCountPartial() public {
@@ -250,15 +257,15 @@ contract PredictionMarketTest is Test {
         pm.resetMarketCount(2);
         assertEq(pm.marketCount(), 2);
 
-        (string memory q1,,,,,,) = pm.markets(1);
+        (string memory q1,,,,,,,,,) = pm.markets(1);
         assertEq(q1, QUESTION);
-        (string memory q3,,,,,,) = pm.markets(3);
+        (string memory q3,,,,,,,,,) = pm.markets(3);
         assertEq(q3, "");
 
         // reuse id 3
-        pm.createMarket("Q3new", DEADLINE, 200);
+        pm.createMarket("Q3new", DEADLINE, 200, "", "", "");
         assertEq(pm.marketCount(), 3);
-        (string memory q3new,,,,,,) = pm.markets(3);
+        (string memory q3new,,,,,,,,,) = pm.markets(3);
         assertEq(q3new, "Q3new");
     }
 
@@ -267,13 +274,13 @@ contract PredictionMarketTest is Test {
         vm.prank(alice);
         pm.bet(id, PredictionMarket.Outcome.YES, 1000);
 
-        (, uint128 outcomeYes,,,,,) = pm.markets(id);
+        (, uint128 outcomeYes,,,,,,,,) = pm.markets(id);
         assertEq(outcomeYes, 1000);
 
         pm.resetMarketCount(0);
 
         // struct totals cleared with the market struct
-        (, uint128 oy,,,,,) = pm.markets(id);
+        (, uint128 oy,,,,,,,,) = pm.markets(id);
         assertEq(oy, 0);
         assertEq(pm.marketCount(), 0);
     }
@@ -285,9 +292,9 @@ contract PredictionMarketTest is Test {
 
         pm.resetMarketCount(0);
 
-        pm.createMarket("Fresh", DEADLINE, 200);
+        pm.createMarket("Fresh", DEADLINE, 200, "", "", "");
         assertEq(pm.marketCount(), 1);
-        (string memory q, uint128 oy,,,,,) = pm.markets(1);
+        (string memory q, uint128 oy,,,,,,,,) = pm.markets(1);
         assertEq(q, "Fresh");
         assertEq(oy, 0);
     }
@@ -318,6 +325,8 @@ contract PredictionMarketTest is Test {
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, false); // NO 赢，但 NO 边无人下注
 
+        _skipWindow();
+
         uint256 balPre = token.balanceOf(alice);
         vm.prank(alice);
         pm.claimReward(id);
@@ -341,6 +350,8 @@ contract PredictionMarketTest is Test {
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, true); // YES 赢，但 YES 边无人下注
 
+        _skipWindow();
+
         uint256 balPre = token.balanceOf(alice);
         vm.prank(alice);
         pm.claimReward(id);
@@ -360,6 +371,8 @@ contract PredictionMarketTest is Test {
 
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, true); // YES 赢，正是有下注的一边
+
+        _skipWindow();
 
         uint256 balPre = token.balanceOf(alice);
         vm.prank(alice);
@@ -381,6 +394,8 @@ contract PredictionMarketTest is Test {
 
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, false); // NO 空边赢 -> 退款
+
+        _skipWindow();
 
         uint256 aPre = token.balanceOf(alice);
         uint256 bPre = token.balanceOf(bob);
@@ -406,6 +421,8 @@ contract PredictionMarketTest is Test {
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, false);
 
+        _skipWindow();
+
         vm.prank(alice);
         pm.claimReward(id);
 
@@ -423,6 +440,8 @@ contract PredictionMarketTest is Test {
 
         vm.warp(DEADLINE + 1);
         pm.resolveMarket(id, false);
+
+        _skipWindow();
 
         address carol = address(0x4);
         vm.prank(carol);

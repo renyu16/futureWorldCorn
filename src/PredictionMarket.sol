@@ -32,6 +32,9 @@ contract PredictionMarket is
         MarketStatus status;
         bool result;
         uint16 feeBps;
+        string resolutionSource;
+        string resolutionRule;
+        string edgeCase;
     }
 
     mapping(uint256 => Market) public markets;
@@ -39,11 +42,20 @@ contract PredictionMarket is
     mapping(uint256 => mapping(address => uint256)) public sharesNo;
     mapping(uint256 => mapping(address => bool)) public claimed;
 
+    mapping(uint256 => bool) public claimFrozen;
+    mapping(uint256 => uint256) public disputeDeadline;
+    mapping(uint256 => uint256) public disputeCount;
+    mapping(uint256 => bool) public disputeLocked;
+    mapping(uint256 => bool) public disputePending;
+
+    uint256 public constant DISPUTE_WINDOW = 24 hours;
+
     event MarketCreated(uint256 indexed id, string question, uint40 deadline);
     event MarketCreatorSet(address indexed creator, bool active);
     event BetPlaced(uint256 indexed id, address indexed user, Outcome outcome, uint256 amount);
     event MarketResolved(uint256 indexed id, bool result);
     event RewardClaimed(uint256 indexed id, address indexed user, uint256 amount);
+    event MarketUnfrozen(uint256 indexed id);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -65,7 +77,14 @@ contract PredictionMarket is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function createMarket(string calldata question, uint40 deadline, uint16 feeBps) external {
+    function createMarket(
+        string calldata question,
+        uint40 deadline,
+        uint16 feeBps,
+        string calldata resolutionSource,
+        string calldata resolutionRule,
+        string calldata edgeCase
+    ) external {
         require(msg.sender == owner() || marketCreators[msg.sender], "unauthorized");
         require(deadline > block.timestamp, "deadline in past");
         uint16 marketFee = feeBps == 0 ? defaultFeeBps : feeBps;
@@ -77,6 +96,9 @@ contract PredictionMarket is
         m.deadline = deadline;
         m.status = MarketStatus.Open;
         m.feeBps = marketFee;
+        m.resolutionSource = resolutionSource;
+        m.resolutionRule = resolutionRule;
+        m.edgeCase = edgeCase;
 
         emit MarketCreated(marketCount, question, deadline);
     }
@@ -118,6 +140,9 @@ contract PredictionMarket is
         m.status = MarketStatus.Resolved;
         m.result = result;
 
+        claimFrozen[marketId] = true;
+        disputeDeadline[marketId] = block.timestamp + DISPUTE_WINDOW;
+
         emit MarketResolved(marketId, result);
     }
 
@@ -125,10 +150,40 @@ contract PredictionMarket is
         require(resolvers[msg.sender], "unauthorized: not a resolver");
         Market storage m = markets[marketId];
         require(m.status == MarketStatus.Resolved, "market not yet resolved");
+        require(!disputeLocked[marketId], "dispute locked");
 
         m.result = result;
+        disputeCount[marketId]++;
 
         emit MarketResolved(marketId, result);
+    }
+
+    function unlockClaims(uint256 marketId) external {
+        require(claimFrozen[marketId], "not frozen");
+        require(block.timestamp >= disputeDeadline[marketId], "dispute window open");
+        require(disputeCount[marketId] == 0, "dispute exists");
+        require(!disputePending[marketId], "dispute in progress");
+
+        claimFrozen[marketId] = false;
+        disputeLocked[marketId] = true;
+
+        emit MarketUnfrozen(marketId);
+    }
+
+    function freezeClaims(uint256 marketId) external {
+        require(msg.sender == owner() || resolvers[msg.sender], "unauthorized");
+        claimFrozen[marketId] = true;
+        disputeDeadline[marketId] = block.timestamp + DISPUTE_WINDOW;
+        disputePending[marketId] = true;
+    }
+
+    function unfreezeClaims(uint256 marketId) external {
+        require(msg.sender == owner() || resolvers[msg.sender], "unauthorized");
+        claimFrozen[marketId] = false;
+        disputeLocked[marketId] = true;
+        disputePending[marketId] = false;
+
+        emit MarketUnfrozen(marketId);
     }
 
     function claimReward(uint256 marketId) external nonReentrant {
@@ -136,8 +191,18 @@ contract PredictionMarket is
         require(m.status == MarketStatus.Resolved, "not resolved");
         require(!claimed[marketId][msg.sender], "already claimed");
 
-        // 空边获胜（获胜那边无人下注）：没有真正的赢家。
-        // 把另一条真实下注边的资金按份额全额退回，防止单边市场资金锁死。
+        if (claimFrozen[marketId]) {
+            if (block.timestamp < disputeDeadline[marketId]) {
+                revert("claims frozen: dispute window open");
+            }
+            if (disputeCount[marketId] > 0 || disputePending[marketId]) {
+                revert("claims frozen: dispute in progress");
+            }
+            claimFrozen[marketId] = false;
+            disputeLocked[marketId] = true;
+            emit MarketUnfrozen(marketId);
+        }
+
         if ((m.result && m.outcomeYes == 0) || (!m.result && m.outcomeNo == 0)) {
             uint256 refundShares = m.result
                 ? sharesNo[marketId][msg.sender]
@@ -186,10 +251,6 @@ contract PredictionMarket is
         defaultFeeBps = _feeBps;
     }
 
-    /// @notice Purge markets above `newCount` and rewind the counter (onlyOwner).
-    ///         Intended for cleaning up orphaned/placeholder markets so ids can be reused.
-    ///         Note: per-address share/claim mappings cannot be enumerated, so only the
-    ///         market structs are cleared. This is safe for markets with no outstanding bets.
     function resetMarketCount(uint256 newCount) external onlyOwner {
         require(newCount < marketCount, "cannot increase");
         for (uint256 i = newCount + 1; i <= marketCount; i++) {
@@ -202,5 +263,10 @@ contract PredictionMarket is
         feeCollector = _feeCollector;
     }
 
-    uint256[50] private __gap;
+    function getMarketPool(uint256 marketId) external view returns (uint256) {
+        Market storage m = markets[marketId];
+        return uint256(m.outcomeYes) + uint256(m.outcomeNo);
+    }
+
+    uint256[45] private __gap;
 }

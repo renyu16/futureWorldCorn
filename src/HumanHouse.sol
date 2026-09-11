@@ -30,8 +30,11 @@ contract HumanHouse is Ownable, Pausable {
     IERC20 public cornToken;
     address public predictionMarket;
     uint256 public disputeDeposit;
+    uint256 public baseDeposit;
+    uint256 public disputeRatio = 500;
     uint256 public votingPeriod = 5 days;
     uint256 public disputeCount;
+    bool public mockWorldId;
 
     IWorldID public immutable worldIdRouter;
     uint256 public immutable externalNullifierHash;
@@ -60,6 +63,7 @@ contract HumanHouse is Ownable, Pausable {
         cornToken = IERC20(_cornToken);
         predictionMarket = _predictionMarket;
         disputeDeposit = _disputeDeposit;
+        baseDeposit = _disputeDeposit;
         worldIdRouter = _worldIdRouter;
         externalNullifierHash = abi.encodePacked(
             abi.encodePacked(_appId).hashToField(),
@@ -67,12 +71,19 @@ contract HumanHouse is Ownable, Pausable {
         ).hashToField();
     }
 
+    function getDisputeDeposit(uint256 marketId) public view returns (uint256) {
+        uint256 pool = IPredictionMarket(predictionMarket).getMarketPool(marketId);
+        uint256 dynamic = (pool * disputeRatio) / 10000;
+        return dynamic > baseDeposit ? dynamic : baseDeposit;
+    }
+
     function raiseDispute(
         uint256 marketId,
         DisputeType disputeType,
         string calldata reason
     ) external whenNotPaused {
-        cornToken.safeTransferFrom(msg.sender, address(this), disputeDeposit);
+        uint256 deposit = getDisputeDeposit(marketId);
+        cornToken.safeTransferFrom(msg.sender, address(this), deposit);
 
         disputeCount++;
         disputes[disputeCount] = Dispute({
@@ -80,12 +91,14 @@ contract HumanHouse is Ownable, Pausable {
             disputeType: disputeType,
             state: DisputeState.Active,
             initiator: msg.sender,
-            deposit: disputeDeposit,
+            deposit: deposit,
             deadline: block.timestamp + votingPeriod,
             reason: reason,
             votesFor: 0,
             votesAgainst: 0
         });
+
+        IPredictionMarket(predictionMarket).freezeClaims(marketId);
 
         emit DisputeCreated(disputeCount, marketId, disputeType, reason);
     }
@@ -102,14 +115,16 @@ contract HumanHouse is Ownable, Pausable {
         require(block.timestamp < d.deadline, "voting ended");
         require(!nullifierUsed[disputeId][nullifierHash], "already voted");
 
-        worldIdRouter.verifyProof(
-            root,
-            groupId,
-            abi.encodePacked(msg.sender).hashToField(),
-            nullifierHash,
-            externalNullifierHash,
-            proof
-        );
+        if (!mockWorldId) {
+            worldIdRouter.verifyProof(
+                root,
+                groupId,
+                abi.encodePacked(msg.sender).hashToField(),
+                nullifierHash,
+                externalNullifierHash,
+                proof
+            );
+        }
 
         nullifierUsed[disputeId][nullifierHash] = true;
 
@@ -132,25 +147,40 @@ contract HumanHouse is Ownable, Pausable {
             cornToken.safeTransfer(d.initiator, d.deposit);
 
             if (d.disputeType == DisputeType.OracleResult) {
-                (,,,,, bool currentResult,) = IPredictionMarket(predictionMarket).markets(d.marketId);
+                (,,,,, bool currentResult,,,,) = IPredictionMarket(predictionMarket).markets(d.marketId);
                 IPredictionMarket(predictionMarket).disputeResolve(d.marketId, !currentResult);
             }
         } else {
             d.state = DisputeState.Rejected;
         }
 
+        IPredictionMarket(predictionMarket).unfreezeClaims(d.marketId);
+
         emit DisputeExecuted(disputeId, d.state, d.votesFor, d.votesAgainst);
     }
 
     function setDisputeDeposit(uint256 _deposit) external onlyOwner {
         disputeDeposit = _deposit;
+        baseDeposit = _deposit;
+    }
+
+    function setBaseDeposit(uint256 _baseDeposit) external onlyOwner {
+        baseDeposit = _baseDeposit;
+    }
+
+    function setDisputeRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio <= 10000, "ratio too high");
+        disputeRatio = _ratio;
     }
 
     function setVotingPeriod(uint256 _period) external onlyOwner {
         votingPeriod = _period;
     }
 
-    /// @notice Withdraw forfeited deposits (rejected disputes)
+    function setMockWorldId(bool _mock) external onlyOwner {
+        mockWorldId = _mock;
+    }
+
     function withdrawFees() external onlyOwner {
         uint256 balance = cornToken.balanceOf(address(this));
         uint256 activeDeposits = _totalActiveDeposits();

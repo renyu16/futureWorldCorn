@@ -136,8 +136,11 @@ APK → WalletConnect relay → MetaMask 签名
 
 ### 阿里云服务器
 - `8.141.100.69:8085` — 业务端口
-  - `/` — 前端静态 SPA
-  - `/rpc` — JSON-RPC 反代 → Alchemy
+  - `/` — 前端静态 SPA（构建产物，无源码）
+  - `/rpc` — JSON-RPC 反代 → Alchemy（解决内地 DNS 问题）
+
+服务器**没有**：数据库、用户管理、后端业务逻辑、API 网关、缓存。
+只有静态文件托管 + RPC 中转两个功能，由 `deploy/webserver/serve.mjs` 一个 Node.js 进程完成。
 
 ### World Chain Sepolia (chainId 4801)
 | 合约 | 地址 |

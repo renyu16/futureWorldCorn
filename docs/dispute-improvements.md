@@ -6,9 +6,15 @@
 |------|------|----------|
 | 抵押金额固定 | `disputeDeposit` 全市场统一，owner 可调 | P2 |
 | 投票权重相同 | 1票=1票，大户小户权重一样 | P3 |
-| 翻转后已领取奖励无法追回 | 已领走的 CORN 不退回，存在抢跑激励 | P1 |
+| 翻转结果无冻结期 | 结算后立即 claim，存在抢跑激励 | P1 |
 | 投票期固定 5 天 | 所有争议统一 5 天 | P4 |
 | World ID 尚未真实集成 | mock 零值证明，可重复刷票 | P0 |
+
+## 设计决策：放弃追回已领取奖励
+
+对标 Polymarket / Augur / Kalshi / Kleros 各平台，**没有任何平台在结算后追回已领取的奖励**，结果均不可逆。追回机制（债务账本、余额扣除）链上无法强制、复杂度高、会伤害正常用户，且 Polymarket 已用实践验证"系统按设计运行=不退款"。
+
+**因此：不从用户钱包追回，改为在结算后设置冻结窗口，把争议前置到领取之前。**
 
 ---
 
@@ -30,32 +36,48 @@
 
 ---
 
-### P1：翻转后追回机制
+### P1：Claim 冻结窗口（防抢跑）
 
 **问题**：`disputeResolve` 只翻转结果，已通过 `claimReward` 领走的 CORN 不退回。先领的人无风险，后领的人受损，存在抢跑激励。
 
-**方案**：冻结期 + 快照机制。
+**行业共识**：Polymarket / Augur / Kalshi 均不追回已领取奖励，结果终局不可逆。追回机制（债务账本/扣余额）复杂度高、链上无法强制、还会伤害正常用户。**决策：放弃追回，改为前置冻结窗口。**
+
+**方案**：结算后的挑战期内冻结 Claim，无争议则正常解冻。
 
 ```
-raiseDispute
-  → 立即冻结所有未 claim 的 claimReward（标记 pending）
-  → 记录快照：每市场每用户已领取金额
+市场结算（resolveMarket）
+  → 进入挑战期（如 24h），claimFrozen[marketId] = true
+  → 所有人无法 claimReward
 
-5天投票期
+挑战期内：
 
-executeDispute（争议通过，翻转结果）
-  → 翻转结果后，按新结果重新计算所有 claim
-  → 已领取的：差额从用户余额扣除（或标记债务）
-  → 未领取的：按新结果结算
+  无人 raiseDispute
+    → 挑战期结束，claimFrozen = false
+    → 用户正常 claim，结果终局
+
+有人 raiseDispute
+    → 进入 HumanHouse 投票（World ID 一人一票）
+    → 投票通过 → 翻转结果 → 解冻 → 按新结果 claim
+    → 投票否决 → 解冻 → 按原结果 claim
+
+已领取的（历史结算时代的少数情况）：不追回
 ```
 
 **需要改动**：
-- PredictionMarket 新增 `frozen` 映射（`mapping(uint256 => bool)`）
-- 新增 `claimReward()` 检查冻结状态，冻结期间 revert
-- HumanHouse `executeDispute()` 调用 `unfreezeAndRecalculate()`
-- 复杂度较高，但彻底解决抢跑问题
+- PredictionMarket 新增 `claimFrozen` 映射（`mapping(uint256 => bool)`）
+- `claimReward()` 检查冻结状态，冻结期间 revert
+- `resolveMarket()` 结算时自动进入冻结期，计时器到期后自动解冻（或 HumanHouse 调用解冻）
+- 可选：OracleAdapter 结算同样先冻结，留给争议窗口
 
-**工作量**：合约 2-3 天 + 前端适配
+**收益**：
+- 彻底消除抢跑（争议期内领不走）
+- 不惩罚正常用户（无债务、无扣款）
+- 复杂度低（仅一个冻结开关 + 计时器）
+- 符合主流平台行为（Polymarket 2h 挑战期即为此模式）
+
+**权衡**：结算后用户要等冻结期才能领，增加 24h 延迟。Polymarket 同样有 2h 挑战期，用户已习惯。
+
+**工作量**：合约 1-2 天 + 前端适配
 
 ---
 

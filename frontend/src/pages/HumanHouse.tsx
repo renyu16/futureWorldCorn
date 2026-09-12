@@ -255,7 +255,8 @@ function RaiseDispute({ onCreated, initialMarketId }: { onCreated: () => void; i
   const { writeContract, isPending: isDisputePending } = useRaiseDispute()
   const { writeContract: writeApprove, isPending: isApprovePending } = useWriteContract()
 
-  const { data: disputeDeposit } = useDisputeDeposit()
+  const validMarketId = /^\d+$/.test(marketId)
+  const { data: disputeDeposit } = useDisputeDeposit(validMarketId ? Number(marketId) : undefined)
   const deposit = (disputeDeposit as bigint | undefined) ?? 0n
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: CORN_TOKEN_ADDRESS,
@@ -265,7 +266,6 @@ function RaiseDispute({ onCreated, initialMarketId }: { onCreated: () => void; i
   })
 
   const needsApprove = deposit > (allowance as bigint)
-  const validMarketId = /^\d+$/.test(marketId)
 
   return (
     <Card>

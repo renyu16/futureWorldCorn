@@ -9,6 +9,9 @@ export type MarketTuple = readonly [
   status: number,
   result: boolean,
   feeBps: number,
+  resolutionSource: string,
+  resolutionRule: string,
+  edgeCase: string,
 ]
 
 export function useMarketCount() {

@@ -49,7 +49,7 @@ export function usePriceHistory(marketId: number) {
         functionName: 'markets',
         args: [BigInt(marketId)],
       })
-      const [, currentYes, currentNo] = marketData as [string, bigint, bigint, number, number, boolean, number]
+      const [, currentYes, currentNo] = marketData as [string, bigint, bigint, number, number, boolean, number, string, string, string]
       const totalEventYes = logs.reduce((sum, l) => sum + ((l.args as any).outcome === 0 ? Number((l.args as any).amount) : 0), 0)
       const totalEventNo = logs.reduce((sum, l) => sum + ((l.args as any).outcome === 1 ? Number((l.args as any).amount) : 0), 0)
       let cumYes = Number(currentYes) - totalEventYes

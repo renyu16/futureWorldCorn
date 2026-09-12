@@ -16,6 +16,9 @@ export function CreateMarket() {
   const [question, setQuestion] = useState('')
   const [deadline, setDeadline] = useState('')
   const [feeBps, setFeeBps] = useState('')
+  const [resolutionSource, setResolutionSource] = useState('')
+  const [resolutionRule, setResolutionRule] = useState('')
+  const [edgeCase, setEdgeCase] = useState('')
   const [status, setStatus] = useState('')
 
   const handleCreate = async () => {
@@ -33,7 +36,7 @@ export function CreateMarket() {
     toast('交易已提交，请等待确认...', 'info')
     writeContract({
       address: PREDICTION_MARKET_ADDRESS, abi: predictionMarketABI, functionName: 'createMarket',
-      args: [question, deadlineUnix, fee],
+      args: [question, deadlineUnix, fee, resolutionSource || '', resolutionRule || '', edgeCase || ''],
     }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['readContract'] }),
       onError: (e: any) => { toast('交易失败: ' + (e.shortMessage ?? e.message), 'error'); setStatus('') },
@@ -59,6 +62,18 @@ export function CreateMarket() {
         <div className="space-y-2">
           <Label htmlFor="create-fee">费率（基点，可选）</Label>
           <Input id="create-fee" type="number" value={feeBps} onChange={(e) => setFeeBps(e.target.value)} placeholder="例如 250 = 2.5%" min="0" max="1000" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="create-source">数据来源（结算规则）</Label>
+          <Input id="create-source" value={resolutionSource} onChange={(e) => setResolutionSource(e.target.value)} placeholder="例如：CoinMarketCap 2026-12-31 23:59 UTC 收盘价" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="create-rule">判定规则</Label>
+          <Input id="create-rule" value={resolutionRule} onChange={(e) => setResolutionRule(e.target.value)} placeholder="例如：YES if BTC USD >= 150000" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="create-edge">边界情况（可选）</Label>
+          <Input id="create-edge" value={edgeCase} onChange={(e) => setEdgeCase(e.target.value)} placeholder="例如：数据源失效由 HumanHouse 仲裁裁决" />
         </div>
         <Button className="w-full" disabled={!question || !deadline || isPending} onClick={handleCreate}>
           {isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> 创建中...</> : '创建市场'}

@@ -41,7 +41,7 @@ const DEFAULT_ADDRESSES: Record<string, ChainAddresses> = {
     oracleAdapter: '0x1457eef9d78eda3e18095f3ff50e15f10764de72',
     govCornToken: '0x3F540371f5E88E3B9625b63411e4ba1FDB4702f0',
     tokenHouse: '0x70Edf96015fE901c44b6b61Ad5CcB9884B545DE9',
-    humanHouse: '0xd1062855477c08bff3c852fc42844ca35db32c72',
+    humanHouse: '0x590b4012ffda851705a39db1b8af8d8aa748bfdc',
   },
   // World Chain 主网（正式上线 TODO：替换为实际部署地址）
   480: {

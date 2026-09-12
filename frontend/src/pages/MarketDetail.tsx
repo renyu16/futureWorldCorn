@@ -144,7 +144,7 @@ export function MarketDetail({ onBack, onRaiseDispute }: Props) {
     </div>
   )
 
-  const [question, outcomeYes, outcomeNo, deadline, status, result, feeBps] = market
+  const [question, outcomeYes, outcomeNo, deadline, status, result, feeBps, resolutionSource, resolutionRule, edgeCase] = market
   const deadlinePassed = Number(deadline) * 1000 < Date.now()
   const statusLabel = getMarketStatusLabel(status, Number(deadline))
   const yesPool = Number(outcomeYes) / 1e18
@@ -249,6 +249,20 @@ export function MarketDetail({ onBack, onRaiseDispute }: Props) {
             <div><span className="text-yes font-medium">YES 资金池：</span><br />{yesPool.toFixed(4)} CORN</div>
             <div><span className="text-no font-medium">NO 资金池：</span><br />{noPool.toFixed(4)} CORN</div>
           </div>
+          {(resolutionSource || resolutionRule || edgeCase) && (
+            <div className="space-y-2 rounded-lg bg-muted/10 p-3 text-xs">
+              <h4 className="font-semibold text-muted text-[11px] uppercase tracking-wide mb-1">结算规则</h4>
+              {resolutionSource && (
+                <div><span className="text-muted">数据来源：</span><span>{resolutionSource}</span></div>
+              )}
+              {resolutionRule && (
+                <div><span className="text-muted">判定规则：</span><span>{resolutionRule}</span></div>
+              )}
+              {edgeCase && (
+                <div><span className="text-muted">边界情况：</span><span>{edgeCase}</span></div>
+              )}
+            </div>
+          )}
           <div className="rounded-lg bg-muted/10 p-3 text-sm">
             <span className="text-muted">您的余额：</span> <span className="font-medium">{userBalance.toFixed(4)} CORN</span>
           </div>

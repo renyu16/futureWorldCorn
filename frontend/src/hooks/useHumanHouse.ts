@@ -3,12 +3,21 @@ import { HUMAN_HOUSE_ADDRESS, humanHouseABI } from '../contracts/abi'
 import { getLogsChunked } from '../lib/getLogsChunked'
 
 // Read hooks
-export function useDisputeDeposit() {
-  return useReadContract({
+export function useDisputeDeposit(marketId?: number | undefined) {
+  const hasMarket = /^\d+$/.test(String(marketId ?? ''))
+  const { data: staticDeposit, ...restStatic } = useReadContract({
     address: HUMAN_HOUSE_ADDRESS,
     abi: humanHouseABI,
     functionName: 'disputeDeposit',
   })
+  const { data: dynamicDeposit } = useReadContract({
+    address: HUMAN_HOUSE_ADDRESS,
+    abi: humanHouseABI,
+    functionName: 'getDisputeDeposit',
+    args: hasMarket ? [BigInt(marketId!)] : undefined,
+  })
+  const deposit = hasMarket ? dynamicDeposit : staticDeposit
+  return { data: deposit, ...restStatic }
 }
 
 export function useVotingPeriod() {

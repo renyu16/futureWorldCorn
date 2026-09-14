@@ -7,7 +7,7 @@ const String cornTokenAddress = '0x7440503d25a38513919203e58db70d3ee14197ed';
 const String predictionMarketAddress = '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026';
 const String govCornTokenAddress = '0x3F540371f5E88E3B9625b63411e4ba1FDB4702f0';
 const String tokenHouseAddress = '0x70Edf96015fE901c44b6b61Ad5CcB9884B545DE9';
-const String humanHouseAddress = '0xd1062855477c08bff3c852fc42844ca35db32c72';
+const String humanHouseAddress = '0x590b4012ffda851705a39db1b8af8d8aa748bfdc';
 
 const List<dynamic> cornTokenAbi = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -69,7 +69,10 @@ const List<dynamic> humanHouseAbi = [
   'function vote(uint256 disputeId, bool support, uint256 root, uint256 nullifierHash, uint256[8] proof)',
   'function executeDispute(uint256 disputeId)',
   'function disputeDeposit() view returns (uint256)',
+  'function getDisputeDeposit(uint256 marketId) view returns (uint256)',
+  'function baseDeposit() view returns (uint256)',
+  'function disputeRatio() view returns (uint256)',
   'function votingPeriod() view returns (uint256)',
   'function disputeCount() view returns (uint256)',
-  'function disputes(uint256 id) view returns (uint256 marketId, uint8 disputeType, uint8 state, address initiator, uint256 deposit, uint256 deadline, string reason, uint256 votesFor, uint256 votesAgainst)',
+  'function mockWorldId() view returns (bool)',
 ];

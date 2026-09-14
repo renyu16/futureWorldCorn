@@ -105,13 +105,17 @@ class _RaiseDisputeCardState extends ConsumerState<_RaiseDisputeCard> {
   @override
   void initState() {
     super.initState();
+    _marketIdController.addListener(_loadDeposit);
     _loadDeposit();
   }
 
   Future<void> _loadDeposit() async {
     final rpcUrl = ref.read(rpcUrlProvider);
     try {
-      final deposit = await ContractService.disputeDeposit(rpcUrl);
+      final marketId = int.tryParse(_marketIdController.text);
+      final deposit = marketId == null
+          ? await ContractService.disputeDeposit(rpcUrl)
+          : await ContractService.getDisputeDeposit(rpcUrl, marketId);
       if (mounted) setState(() => _deposit = deposit);
     } catch (_) {}
   }

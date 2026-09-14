@@ -142,18 +142,23 @@ class ContractService {
   }
 
   // ── Dispute reads ──
+  // selector = keccak256(signature)[:4]：如 '0xa28889e1' = disputeCount()，'0xfe7e5ec0' = getDisputeDeposit(uint256)
 
   static Future<int> disputeCount(String rpcUrl) async {
-    final val = await _readUint(rpcUrl, addr.humanHouseAddress, '0xeb8d2a04');
+    final val = await _readUint(rpcUrl, addr.humanHouseAddress, '0xa28889e1');
     return val.toInt();
   }
 
   static Future<BigInt> disputeDeposit(String rpcUrl) async {
-    return _readUint(rpcUrl, addr.humanHouseAddress, '0x43058948');
+    return _readUint(rpcUrl, addr.humanHouseAddress, '0x29e03ff1');
+  }
+
+  static Future<BigInt> getDisputeDeposit(String rpcUrl, int marketId) async {
+    return _readUint(rpcUrl, addr.humanHouseAddress, '0xfe7e5ec0${_uintPadInt(marketId)}');
   }
 
   static Future<BigInt> disputeVotingPeriod(String rpcUrl) async {
-    return _readUint(rpcUrl, addr.humanHouseAddress, '0xd6a3844a');
+    return _readUint(rpcUrl, addr.humanHouseAddress, '0x02a251a3');
   }
 
   static Future<Map<String, dynamic>?> getDispute(String rpcUrl, int disputeId) async {

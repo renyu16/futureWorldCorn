@@ -392,17 +392,35 @@ class ContractService {
         '${active ? '0000000000000000000000000000000000000000000000000000000000000001' : '0000000000000000000000000000000000000000000000000000000000000000'}';
   }
 
-  static String createMarketData(String question, int deadline, int feeBps) {
-    final qBytes = utf8.encode(question);
-    final qLen = qBytes.length;
-    final qHex = qBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    final qPaddedLen = ((qLen + 31) ~/ 32) * 32;
-    final qPadded = qHex.padRight(qPaddedLen * 2, '0');
-    return '0xd4c034b7'
-        '${(96).toRadixString(16).padLeft(64, '0')}'
+  static String createMarketData(String question, int deadline, int feeBps,
+      [String resolutionSource = '', String resolutionRule = '', String edgeCase = '']) {
+    // ABI 编码 createMarket(string,uint40,uint16,string,string,string)
+    String encStr(String s) {
+      final bytes = utf8.encode(s);
+      final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final paddedLen = ((bytes.length + 31) ~/ 32) * 32;
+      return '${bytes.length.toRadixString(16).padLeft(64, '0')}'
+          '${hex.padRight(paddedLen * 2, '0')}';
+    }
+
+    final q = encStr(question);
+    final src = encStr(resolutionSource);
+    final rule = encStr(resolutionRule);
+    final edge = encStr(edgeCase);
+
+    const head = 192;
+    final qOffset = head;
+    final srcOffset = qOffset + q.length ~/ 2;
+    final ruleOffset = srcOffset + src.length ~/ 2;
+    final edgeOffset = ruleOffset + rule.length ~/ 2;
+
+    return '0x23813440'
+        '${qOffset.toRadixString(16).padLeft(64, '0')}'
         '${deadline.toRadixString(16).padLeft(64, '0')}'
         '${feeBps.toRadixString(16).padLeft(64, '0')}'
-        '${qLen.toRadixString(16).padLeft(64, '0')}'
-        '$qPadded';
+        '${srcOffset.toRadixString(16).padLeft(64, '0')}'
+        '${ruleOffset.toRadixString(16).padLeft(64, '0')}'
+        '${edgeOffset.toRadixString(16).padLeft(64, '0')}'
+        '$q$src$rule$edge';
   }
 }

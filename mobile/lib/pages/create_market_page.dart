@@ -20,6 +20,9 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
   final _deadlineDateCtrl = TextEditingController();
   final _deadlineTimeCtrl = TextEditingController();
   final _feeBpsCtrl = TextEditingController();
+  final _sourceCtrl = TextEditingController();
+  final _ruleCtrl = TextEditingController();
+  final _edgeCaseCtrl = TextEditingController();
   DateTime? _deadlineDate;
   TimeOfDay? _deadlineTime;
   bool _loadingPerm = true;
@@ -200,7 +203,8 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
       return;
     }
 
-    final data = ContractService.createMarketData(question, deadlineUnix, feeBps);
+    final data = ContractService.createMarketData(question, deadlineUnix, feeBps,
+        _sourceCtrl.text.trim(), _ruleCtrl.text.trim(), _edgeCaseCtrl.text.trim());
     await _submitTransaction(addr.predictionMarketAddress, data);
   }
 
@@ -333,6 +337,29 @@ class _CreateMarketPageState extends ConsumerState<CreateMarketPage> {
                   ]),
                   Text('0 = 使用默认费率 ($_defaultFee bps)；最大 1000（10%）',
                       style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+                  const SizedBox(height: 16),
+
+                  // Resolution metadata
+                  Text('数据来源（结算规则）', style: TextStyle(fontSize: 13, color: AppTheme.muted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _sourceCtrl,
+                    decoration: const InputDecoration(hintText: '例如：CoinMarketCap 收盘价'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('判定规则', style: TextStyle(fontSize: 13, color: AppTheme.muted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _ruleCtrl,
+                    decoration: const InputDecoration(hintText: '例如：YES if BTC USD >= 150000'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('边界情况（可选）', style: TextStyle(fontSize: 13, color: AppTheme.muted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _edgeCaseCtrl,
+                    decoration: const InputDecoration(hintText: '例如：数据源失效由 HumanHouse 仲裁'),
+                  ),
                   const SizedBox(height: 20),
 
                   // Submit

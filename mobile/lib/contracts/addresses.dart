@@ -17,7 +17,7 @@ const List<dynamic> cornTokenAbi = [
 ];
 
 const List<dynamic> predictionMarketAbi = [
-  'function createMarket(string question, uint40 deadline, uint16 feeBps)',
+  'function createMarket(string question, uint40 deadline, uint16 feeBps, string resolutionSource, string resolutionRule, string edgeCase)',
   'function bet(uint256 marketId, uint8 outcome, uint256 amount)',
   'function resolveMarket(uint256 marketId, bool result)',
   'function claimReward(uint256 marketId)',

@@ -9,6 +9,10 @@ interface ImportMetaEnv {
   readonly VITE_RPC_URL?: string
   /** 区块浏览器（缺省按链映射） */
   readonly VITE_EXPLORER_URL?: string
+  /** 结算自动广播 API 地址（缺省同源 /api/settle） */
+  readonly VITE_SETTLE_API_URL?: string
+  /** 结算自动广播 Bearer token（为空则跳过自动广播） */
+  readonly VITE_SETTLE_API_TOKEN?: string
   /** WalletConnect Cloud Project ID（https://cloud.walletconnect.com 免费注册） */
   readonly VITE_PROJECT_ID?: string
   /** 合约地址覆盖（不设置时用 src/config.ts 内置双链地址表） */

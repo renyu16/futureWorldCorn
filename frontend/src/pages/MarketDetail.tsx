@@ -3,9 +3,11 @@ import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAccount, usePublicClient, useReadContract } from 'wagmi'
 import { formatEther } from 'viem'
-import { useMarketTuple, useWriteBet, useWriteClaimReward, useWriteResolveMarket } from '../hooks/useMarket'
+import { encodeFunctionData } from 'viem'
+import { useMarketTuple, useWriteBet, useWriteClaimReward } from '../hooks/useMarket'
 import { useTokenBalance, useTokenAllowance, useWriteApprove } from '../hooks/useToken'
 import { CORN_TOKEN_ADDRESS, cornTokenABI, PREDICTION_MARKET_ADDRESS, predictionMarketABI, HUMAN_HOUSE_ADDRESS, humanHouseABI } from '../contracts/abi'
+import { EXPLORER_URL, SETTLE_API_URL, SETTLE_API_TOKEN } from '../config'
 import { fetchAllDisputes } from '../hooks/useHumanHouse'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -65,10 +67,15 @@ export function MarketDetail({ onBack, onRaiseDispute }: Props) {
   const { writeContract: approve, isPending: isApprovePending } = useWriteApprove()
   const { writeContract: bet, isPending: isBetPending } = useWriteBet()
   const { writeContract: claim, isPending: isClaimPending } = useWriteClaimReward()
-  const { writeContract: resolve, isPending: isResolvePending } = useWriteResolveMarket()
   const publicClient = usePublicClient()
   const { data: priceHistory, isLoading: priceLoading } = usePriceHistory(marketId)
   const [disputes, setDisputes] = useState<{ id: bigint; disputeType: number; reason: string; state: number; votesFor: number; votesAgainst: number; deposit: bigint }[]>([])
+  const [settle, setSettle] = useState<{
+    status: 'idle' | 'pending' | 'ok' | 'manual'
+    txHash?: string
+    error?: string
+  }>({ status: 'idle' })
+  const [manual, setManual] = useState<{ payload: string; castCmd: string } | null>(null)
   const [, forceUpdate] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => forceUpdate(n => n + 1), 30000)
@@ -206,15 +213,49 @@ export function MarketDetail({ onBack, onRaiseDispute }: Props) {
     }
   }
 
-  const handleResolve = async (win: boolean) => {
+  const buildManualSettle = (win: boolean) => {
+    const data = encodeFunctionData({
+      abi: predictionMarketABI,
+      functionName: 'resolveMarket',
+      args: [BigInt(marketId), win],
+    })
+    return {
+      payload: JSON.stringify({ to: PREDICTION_MARKET_ADDRESS, data, value: '0x0' }, null, 2),
+      castCmd: `cast send ${PREDICTION_MARKET_ADDRESS} "resolveMarket(uint256,bool)" ${marketId} ${win}`,
+    }
+  }
+
+  const copyText = async (text: string, label: string) => {
     try {
-      toast('交易已提交，请等待确认...', 'info')
-      resolve({
-        address: PREDICTION_MARKET_ADDRESS, abi: predictionMarketABI, functionName: 'resolveMarket',
-        args: [BigInt(marketId), win],
-      }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: ['readContract'] }), onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error') })
+      await navigator.clipboard.writeText(text)
+      toast(`${label} 已复制`, 'info')
+    } catch {
+      toast('复制失败', 'error')
+    }
+  }
+
+  const handleResolve = async (win: boolean) => {
+    if (!SETTLE_API_TOKEN) {
+      setSettle({ status: 'manual', error: '未配置自动广播 token' })
+      return
+    }
+    setSettle({ status: 'pending' })
+    try {
+      const res = await fetch(SETTLE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SETTLE_API_TOKEN}` },
+        body: JSON.stringify({ marketId, result: win }),
+      })
+      const payload = await res.json().catch(() => null) as { ok?: boolean; txHash?: string; error?: string } | null
+      if (res.ok && payload?.ok && payload.txHash) {
+        setSettle({ status: 'ok', txHash: payload.txHash })
+        toast('结算已自动广播', 'info')
+        queryClient.invalidateQueries({ queryKey: ['readContract'] })
+        return
+      }
+      setSettle({ status: 'manual', error: payload?.error })
     } catch (e: any) {
-      toast('交易失败: ' + (e.message || '未知错误'), 'error')
+      setSettle({ status: 'manual', error: e?.message || '网络错误' })
     }
   }
 
@@ -308,15 +349,51 @@ export function MarketDetail({ onBack, onRaiseDispute }: Props) {
           {isOpen && canResolve && deadlinePassed && (
             <div className="space-y-3 border-t border-border pt-4">
               <h3 className="font-semibold">结算市场</h3>
-              <p className="text-sm text-muted">截止时间已过，请选择获胜结果。</p>
-              <div className="flex gap-2">
-                <Button className="flex-1 min-w-0" variant="outline" disabled={isResolvePending} onClick={() => handleResolve(true)}>
-                  {isResolvePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '结算 YES 胜'}
-                </Button>
-                <Button className="flex-1 min-w-0" variant="outline" disabled={isResolvePending} onClick={() => handleResolve(false)}>
-                  {isResolvePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '结算 NO 胜'}
-                </Button>
-              </div>
+              {settle.status === 'ok' ? (
+                <div className="space-y-2 rounded-lg bg-muted/10 p-3 text-sm">
+                  <p className="text-green-600">已自动广播：{settle.txHash}</p>
+                  <a
+                    href={`${EXPLORER_URL}/tx/${settle.txHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-primary underline"
+                  >
+                    在区块浏览器查看
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17L17 7M7 7h10v10"/></svg>
+                  </a>
+                </div>
+              ) : settle.status === 'pending' ? (
+                <p className="flex items-center gap-2 text-sm text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" /> 正在自动广播结算交易...
+                </p>
+              ) : settle.status === 'manual' ? (
+                <div className="space-y-2">
+                  {settle.error && <p className="text-xs text-amber-600">自动广播失败：{settle.error}</p>}
+                  <p className="text-sm text-muted">自动广播不可用，请选择结算结果并手动广播。</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setManual(buildManualSettle(true))}>结算 YES 胜</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => setManual(buildManualSettle(false))}>结算 NO 胜</Button>
+                  </div>
+                  {manual && (
+                    <div className="space-y-2 rounded-lg bg-muted/10 p-3">
+                      <textarea readOnly value={manual.payload} rows={6}
+                        className="w-full resize-y rounded border bg-background p-2 font-mono text-xs" />
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => copyText(manual.payload, '交易数据')}>复制交易数据(JSON)</Button>
+                        <Button size="sm" variant="outline" onClick={() => copyText(manual.castCmd, 'cast 命令')}>复制 cast 命令</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted">截止时间已过，请选择获胜结果。优先服务端自动广播，失败可手动广播。</p>
+                  <div className="flex gap-2">
+                    <Button className="flex-1" variant="outline" onClick={() => handleResolve(true)}>结算 YES 胜</Button>
+                    <Button className="flex-1" variant="outline" onClick={() => handleResolve(false)}>结算 NO 胜</Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

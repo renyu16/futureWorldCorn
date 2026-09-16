@@ -99,6 +99,12 @@ export const EXPLORER_URL = pickStr(
   CHAIN_META[CHAIN_ID]?.explorer ?? CHAIN_META[DEFAULT_CHAIN_ID].explorer,
 )
 
+/** 结算自动广播 API（VITE_SETTLE_API_URL，缺省同源 /api/settle） */
+export const SETTLE_API_URL = pickStr('VITE_SETTLE_API_URL', '/api/settle')
+
+/** 结算自动广播 Bearer token（VITE_SETTLE_API_TOKEN；为空则跳过自动广播直接手动兜底） */
+export const SETTLE_API_TOKEN = pickStr('VITE_SETTLE_API_TOKEN', '')
+
 /**
  * WalletConnect Cloud Project ID（https://cloud.walletconnect.com 免费注册）。
  * 当前为开发用默认值；正式上线建议替换为自有项目 ID（VITE_PROJECT_ID）。

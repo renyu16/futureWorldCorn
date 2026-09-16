@@ -47,6 +47,13 @@ const port = args.port;
 const host = args.host;
 const rpcUpstream = args.rpcUpstream;
 
+const SETTLE_PRIVATE_KEY = process.env.SETTLE_PRIVATE_KEY || '';
+const SETTLE_API_TOKEN = process.env.SETTLE_API_TOKEN || '';
+const SETTLE_PREDICTION_MARKET_ADDRESS =
+  process.env.SETTLE_PREDICTION_MARKET_ADDRESS ||
+  '0x9cb69cb7da9677b3a122a6a4e402398a6df4a026';
+const SETTLE_TIMEOUT = 30000;
+
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   console.error(`error: invalid port: ${args.port}`);
   process.exit(1);
@@ -104,6 +111,68 @@ function proxyRpc(req, res) {
   req.on('error', () => send(res, 400, 'Bad Request'));
 }
 
+function readJsonBody(req, cb) {
+  const chunks = [];
+  req.on('data', (c) => chunks.push(c));
+  req.on('end', () => {
+    try {
+      cb(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    } catch {
+      cb(null);
+    }
+  });
+  req.on('error', () => cb(null));
+}
+
+function sendJson(res, status, obj) {
+  send(res, status, JSON.stringify(obj), {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+}
+
+async function handleSettle(req, res) {
+  if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'method not allowed' });
+  const auth = (req.headers['authorization'] || '').trim();
+  const expected = `Bearer ${SETTLE_API_TOKEN}`;
+  if (!SETTLE_API_TOKEN || auth !== expected) {
+    return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+  }
+  readJsonBody(req, async (body) => {
+    if (!body || typeof body.marketId !== 'number' || typeof body.result !== 'boolean') {
+      return sendJson(res, 400, { ok: false, error: 'invalid body: "marketId" (number) and "result" (boolean) required' });
+    }
+    const marketId = body.marketId;
+    if (!Number.isInteger(marketId) || marketId < 1) {
+      return sendJson(res, 400, { ok: false, error: 'invalid marketId' });
+    }
+    if (!SETTLE_PRIVATE_KEY) {
+      return sendJson(res, 501, { ok: false, error: 'settle not configured: missing SETTLE_PRIVATE_KEY' });
+    }
+    let ethers;
+    try {
+      ethers = await import('ethers');
+    } catch {
+      return sendJson(res, 501, { ok: false, error: 'settle not configured: ethers not installed (run "npm install" in deploy/webserver)' });
+    }
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUpstream, undefined, { staticNetwork: true });
+      const wallet = new ethers.Wallet(SETTLE_PRIVATE_KEY, provider);
+      const iface = new ethers.Interface(['function resolveMarket(uint256 marketId, bool result)']);
+      const data = iface.encodeFunctionData('resolveMarket', [marketId, result]);
+      const tx = await wallet.sendTransaction({ to: SETTLE_PREDICTION_MARKET_ADDRESS, data });
+      const receipt = await Promise.race([
+        tx.wait(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('tx wait timeout')), SETTLE_TIMEOUT)),
+      ]);
+      return sendJson(res, 200, { ok: true, txHash: receipt.hash || tx.hash });
+    } catch (e) {
+      console.error(`settle error: ${e?.message || e}`);
+      return sendJson(res, 200, { ok: false, error: 'broadcast failed: ' + (e?.shortMessage || e?.message || 'unknown') });
+    }
+  });
+}
+
 function serveFile(res, filePath) {
   fs.readFile(filePath, (err, buf) => {
     if (err) return send(res, 404, 'Not Found');
@@ -120,6 +189,7 @@ const server = http.createServer((req, res) => {
     return send(res, 400, 'Bad Request');
   }
   if (urlPath === RPC_PATH) return proxyRpc(req, res);
+  if (urlPath === '/api/settle') return handleSettle(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method Not Allowed');
   let filePath = path.join(root, urlPath === '/' ? 'index.html' : urlPath);
   if (!filePath.startsWith(root)) return send(res, 403, 'Forbidden');

@@ -65,3 +65,7 @@ writeContract → 钱包弹窗 → 用户核对合约地址+函数签名 → 广
 - 不引入多签/timelock 合约改造（记为主网上线前增强）。
 - 不做 resolver 枚举 / 事件索引 / 审计日志页（暂以浏览器 + 区块浏览器兜底）。
 - 不改合约、不改后端。
+
+## 实现状态（2026-09-17）
+
+已实现：`/admin` 路由 + 角色门禁（owner/operator/none/unconnected/unknown）、只读信息区、Resolver 授权管理（仅 owner）、市场结算（owner+operator，四连确认 + 链守卫 + 不存在/非可结算保护）。纯函数 `src/lib/admin.ts` 有单测。详见 `2026-09-17-admin-panel-plan.md`。

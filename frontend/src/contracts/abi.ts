@@ -24,6 +24,7 @@ export const predictionMarketABI = parseAbi([
   'function createMarket(string question, uint40 deadline, uint16 feeBps, string resolutionSource, string resolutionRule, string edgeCase)',
   'function bet(uint256 marketId, uint8 outcome, uint256 amount)',
   'function resolveMarket(uint256 marketId, bool result)',
+  'function setResolver(address operator, bool authorized)',
   'function claimReward(uint256 marketId)',
   'function marketCount() view returns (uint256)',
   'function markets(uint256 id) view returns (string question, uint128 outcomeYes, uint128 outcomeNo, uint40 deadline, uint8 status, bool result, uint16 feeBps, string resolutionSource, string resolutionRule, string edgeCase)',

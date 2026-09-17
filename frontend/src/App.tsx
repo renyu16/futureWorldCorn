@@ -14,6 +14,8 @@ import { Settings } from './pages/Settings'
 import { Button } from '@/components/ui/button'
 import { TrendingUp, Menu, X } from 'lucide-react'
 import { PREDICTION_MARKET_ADDRESS, predictionMarketABI } from './contracts/abi'
+import { getAdminRole } from './lib/admin'
+import { Admin } from './pages/Admin'
 import { cn } from '@/lib/utils'
 
 function NetworkBanner() {
@@ -42,9 +44,19 @@ function App() {
     functionName: 'owner',
   })
   const isOwner = address && owner ? address.toLowerCase() === (owner as string).toLowerCase() : false
+  const { data: amIResolver } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'resolvers',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  })
+  const adminRole = getAdminRole({ address, owner: owner as string | undefined, isResolver: amIResolver === true })
+  const canAdmin = adminRole === 'owner' || adminRole === 'operator'
 
   const navItems = [
     { path: '/', label: '市场' },
+    ...(canAdmin ? [{ path: '/admin', label: '管理' }] : []),
     ...(isOwner ? [{ path: '/create', label: '创建' }] : []),
     { path: '/portfolio', label: '投资组合' },
     { path: '/delegate', label: '委托' },
@@ -116,6 +128,7 @@ function App() {
       <main className="mx-auto max-w-6xl px-4 py-8">
         <Routes>
           <Route path="/" element={<MarketList onSelect={(id) => navigate(`/market/${id}`)} />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/market/:marketId" element={
             <MarketDetail
               onBack={() => navigate('/')}

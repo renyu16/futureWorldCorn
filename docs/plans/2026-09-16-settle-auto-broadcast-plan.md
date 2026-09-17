@@ -418,7 +418,7 @@ Expected: `0x57bde446`（2026-09-17 实测 ethers encode 输出开头，前端 m
 
 **Step 3: 端到端（真实 key，谨慎）**
 - 设置 `.env`：`SETTLE_PRIVATE_KEY`、`SETTLE_API_TOKEN`。
-- 前置：链上 owner 已 `setResolver(0xbaD893..., true)`（发布 `feat` 后由 owner key 执行，见 Task 6）。
+- 前置：链上 owner 已 `setResolver(0xbaD893..., true)`（发布 `feat` 后由 owner key 执行，见 Task 6；也可用 `/admin` 面板「Resolver 授权管理」替代）。
 - curl 一个「已到期未结算」的市场：
 ```powershell
 curl.exe -s -X POST http://127.0.0.1:8199/api/settle -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"marketId\":1,\"result\":true}"
@@ -439,6 +439,8 @@ git commit -m "chore: lock ethers for settle auto-broadcast"
 ## Task 6: 链上授权 resolver（ops，需用户配合确认）
 
 **Files:** 无代码
+
+> **方式 A（推荐，前端发已实现）：** 打开 `/admin` 面板 → 「Resolver 授权管理」（仅 Owner 可见）→ 输入 AI_DEV_B 地址 → 点「授权为 Resolver」→ Owner 钱包确认。效果与下方 cast 命令等价（均调 `setResolver(addr, true)`）。本面板由 `2026-09-17-admin-panel-plan.md` 实现并已推送。
 
 - owner key（AI_DEV_A）在测试网把服务端广播 key（AI_DEV_B `0xbaD8931A4A6a25710644BcA9F9d07680ABaB1dA5`）授权为 resolver：
 ```bash

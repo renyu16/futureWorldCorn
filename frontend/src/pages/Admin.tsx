@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { WalletConnect } from '../components/WalletConnect'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useWriteSetResolver } from '../hooks/useMarket'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Loader2 } from 'lucide-react'
+import { useToast } from '../components/Toast'
+import { isValidAddress } from '../lib/helpers'
 
 const ROLE_LABEL: Record<AdminRole, string> = {
   owner: 'Owner',
@@ -53,9 +61,42 @@ export function Admin() {
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   })
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const { writeContract: setResolver, isPending: isSetResolverPending } = useWriteSetResolver()
+  const [addrInput, setAddrInput] = useState('')
+  const validAddr = isValidAddress(addrInput.trim())
+  const { data: targetIsResolver } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'resolvers',
+    args: validAddr ? [addrInput.trim() as `0x${string}`] : undefined,
+    query: { enabled: validAddr },
+  })
 
   const role = getAdminRole({ address, owner: owner as string | undefined, isResolver: amIResolver === true })
   const onRightChain = isRightChain(connectedChainId, CHAIN_ID)
+
+  const handleSetResolver = (authorized: boolean) => {
+    const target = addrInput.trim() as `0x${string}`
+    if (!validAddr || !onRightChain) return
+    toast('交易已提交，请等待确认...', 'info')
+    setResolver(
+      {
+        address: PREDICTION_MARKET_ADDRESS,
+        abi: predictionMarketABI,
+        functionName: 'setResolver',
+        args: [target, authorized],
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['readContract'] })
+          toast(authorized ? '已授权该地址为 Resolver' : '已撤销该地址的 Resolver 权限', 'info')
+        },
+        onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error'),
+      }
+    )
+  }
 
   if (!address) {
     return (
@@ -117,7 +158,47 @@ export function Admin() {
         </CardContent>
       </Card>
 
-      {/* Task 4 注入：Resolver 管理区（仅 owner） */}
+      {role === 'owner' && (
+        <Card>
+          <CardHeader><CardTitle>Resolver 授权管理</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted">合约无 enumerable 列表，只能按地址查询后授权/撤销。</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={addrInput}
+                onChange={(e) => setAddrInput(e.target.value)}
+                placeholder="0x... 输入 operator 地址"
+                className="max-w-sm font-mono text-xs"
+              />
+              {validAddr && (
+                <Badge variant={targetIsResolver ? 'success' : 'secondary'}>
+                  {targetIsResolver ? '已授权' : '未授权'}
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                disabled={!validAddr || isSetResolverPending || !onRightChain}
+                onClick={() => handleSetResolver(true)}
+              >
+                {isSetResolverPending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '授权为 Resolver'}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!validAddr || isSetResolverPending || !onRightChain}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => handleSetResolver(false)}
+              >
+                {isSetResolverPending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '撤销授权'}
+              </Button>
+            </div>
+            <div className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">
+              撤销前注意：若该 key 已在链上结算错误结果，请先用备用 owner/resolver key 调 <code>disputeResolve</code> 纠正，
+              再撤销 bad key；仅撤销无法回滚已上链结果。
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Task 5 注入：结算区（owner + operator） */}
     </div>
   )

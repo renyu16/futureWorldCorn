@@ -66,7 +66,7 @@ export function Admin() {
   const { writeContract: setResolver, isPending: isSetResolverPending } = useWriteSetResolver()
   const [addrInput, setAddrInput] = useState('')
   const validAddr = isValidAddress(addrInput.trim())
-  const { data: targetIsResolver } = useReadContract({
+  const { data: targetIsResolver, isFetching: isResolverFetching } = useReadContract({
     address: PREDICTION_MARKET_ADDRESS,
     abi: predictionMarketABI,
     functionName: 'resolvers',
@@ -171,8 +171,8 @@ export function Admin() {
                 className="max-w-sm font-mono text-xs"
               />
               {validAddr && (
-                <Badge variant={targetIsResolver ? 'success' : 'secondary'}>
-                  {targetIsResolver ? '已授权' : '未授权'}
+                <Badge variant={isResolverFetching ? 'secondary' : targetIsResolver ? 'success' : 'secondary'}>
+                  {isResolverFetching ? '查询中' : targetIsResolver ? '已授权' : '未授权'}
                 </Badge>
               )}
             </div>

@@ -252,7 +252,7 @@ export function Admin() {
               </Button>
             </div>
             <div className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">
-              撤销前注意：若该 key 已在链上结算错误结果，请先用备用 owner/resolver key 调 <code>disputeResolve</code> 纠正，
+              撤销前注意：若该 key 已在链上结算错误结果，请先用仍有效的 resolver key 调 <code>disputeResolve</code> 纠正，
               再撤销 bad key；仅撤销无法回滚已上链结果。
             </div>
           </CardContent>
@@ -326,7 +326,7 @@ export function Admin() {
                 在区块浏览器查看
               </a>
               <p className="text-xs text-amber-600">
-                纠错提示：如结算结果有误，请用 owner 或备用 resolver key 调用 disputeResolve 纠正；若广播用的 key 已泄露，纠正后再 setResolver 撤销该 key。
+                纠错提示：如结算结果有误，需用已授权的 resolver key 调用 disputeResolve 纠正（owner 也须先 setResolver 授权自身为 resolver）；若广播用的 key 已泄露，纠正后再 setResolver 撤销该 key。
               </p>
             </div>
           )}

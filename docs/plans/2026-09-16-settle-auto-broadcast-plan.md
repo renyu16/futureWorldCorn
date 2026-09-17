@@ -405,16 +405,16 @@ Run:
 ```powershell
 cd deploy/webserver
 npm install --omit=dev
-node -e "const {ethers}=await import('ethers'); const iface=new ethers.Interface(['function resolveMarket(uint256,bool)']); console.log(iface.encodeFunctionData('resolveMarket',[1,true]))"
+node --input-type=module -e "const {ethers}=await import('ethers'); const iface=new ethers.Interface(['function resolveMarket(uint256,bool)']); console.log(iface.encodeFunctionData('resolveMarket',[1,true]))"
 ```
-Expected: 打印形如 `0x10a9d6b60000...0001` 的 calldata（开头 selector `0x10a9d6b6`，后面 32 字节 marketId=1、32 字节 result=true）。若 selector 不符需与预言机核对——`resolveMarket` 应是 `0x10a9d6b6`（可在 cast sig 确认）。
+Expected: 打印形如 `0x57bde4460000...0001` 的 calldata（开头 selector `0x57bde446`，后面 32 字节 marketId=1、32 字节 result=true）。`resolveMarket` selector 实测定为 `0x57bde446`（2026-09-17 验证），与前端手动兜底的 `cast send ... "resolveMarket(uint256,bool)"` 命令一致。
 
 **Step 2: cast 校验 selector（可选）**
 Run:
 ```powershell
 cast sig "resolveMarket(uint256,bool)"
 ```
-Expected: `0x10a9d6b6`（与本计划 Task2 的 encode 输出一致即可，若不一致以实测为准并在实现中调整）。
+Expected: `0x57bde446`（2026-09-17 实测 ethers encode 输出开头，前端 manual 兜底文案据此确认）。
 
 **Step 3: 端到端（真实 key，谨慎）**
 - 设置 `.env`：`SETTLE_PRIVATE_KEY`、`SETTLE_API_TOKEN`。

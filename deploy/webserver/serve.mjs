@@ -77,7 +77,8 @@ function proxyRpc(req, res) {
     } catch {
       return send(res, 500, JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32099, message: 'bad upstream config' } }));
     }
-    const outReq = https.request(
+    const client = upstream.protocol === 'http:' ? http : https;
+    const outReq = client.request(
       upstream,
       {
         method: 'POST',
@@ -142,7 +143,7 @@ async function handleSettle(req, res) {
     if (!body || typeof body.marketId !== 'number' || typeof body.result !== 'boolean') {
       return sendJson(res, 400, { ok: false, error: 'invalid body: "marketId" (number) and "result" (boolean) required' });
     }
-    const marketId = body.marketId;
+    const { marketId, result } = body;
     if (!Number.isInteger(marketId) || marketId < 1) {
       return sendJson(res, 400, { ok: false, error: 'invalid marketId' });
     }

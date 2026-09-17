@@ -56,6 +56,10 @@ export function useWriteSetResolver() {
   return useWriteContract()
 }
 
+export function useWriteMarketResolve() {
+  return useWriteContract()
+}
+
 export function useAllMarkets() {
   const { data: count, isLoading, isError, error, refetch } = useMarketCount()
   const total = Number(count ?? 0)

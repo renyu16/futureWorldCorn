@@ -1,6 +1,6 @@
 import { useAccount, useChainId, useReadContract } from 'wagmi'
 import { PREDICTION_MARKET_ADDRESS, predictionMarketABI } from '../contracts/abi'
-import { CHAIN_ID, CHAIN_NAME } from '../config'
+import { CHAIN_ID, CHAIN_NAME, EXPLORER_URL } from '../config'
 import { getAdminRole, isRightChain, type AdminRole } from '../lib/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,12 +8,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { WalletConnect } from '../components/WalletConnect'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useWriteSetResolver } from '../hooks/useMarket'
+import { useWriteMarketResolve, useWriteSetResolver } from '../hooks/useMarket'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
-import { isValidAddress } from '../lib/helpers'
+import { getMarketStatusLabel, isValidAddress } from '../lib/helpers'
 
 const ROLE_LABEL: Record<AdminRole, string> = {
   owner: 'Owner',
@@ -73,6 +73,27 @@ export function Admin() {
     args: validAddr ? [addrInput.trim() as `0x${string}`] : undefined,
     query: { enabled: validAddr },
   })
+  const { writeContract: resolve, isPending: isResolvePending } = useWriteMarketResolve()
+  const [marketIdInput, setMarketIdInput] = useState('')
+  const marketIdNum = Number(marketIdInput.trim())
+  const marketIdValid = /^\d+$/.test(marketIdInput.trim()) && marketIdNum >= 0
+  const [confirmState, setConfirmState] = useState<null | { marketId: number; win: boolean }>(null)
+  const [succeed, setSucceed] = useState<{ marketId: number; txHash: string } | null>(null)
+  const { data: mktData } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'markets',
+    args: marketIdValid ? [BigInt(marketIdNum)] : undefined,
+    query: { enabled: marketIdValid },
+  })
+  const mkt = mktData as readonly string[] | undefined
+  const mktStatus = mkt ? Number(mkt[4]) : undefined
+  const mktDeadline = mkt ? Number(mkt[3]) : undefined
+  const mktDeadlinePassed = mktDeadline !== undefined && mktDeadline * 1000 < Date.now()
+  const mktSettlable = mktStatus === 0 && mktDeadlinePassed
+  const mktStatusLabel = mktStatus !== undefined && mktDeadline !== undefined
+    ? getMarketStatusLabel(mktStatus, mktDeadline)
+    : undefined
 
   const role = getAdminRole({ address, owner: owner as string | undefined, isResolver: amIResolver === true })
   const onRightChain = isRightChain(connectedChainId, CHAIN_ID)
@@ -96,6 +117,38 @@ export function Admin() {
         onError: (e: any) => toast('交易失败: ' + (e.shortMessage ?? e.message), 'error'),
       }
     )
+  }
+
+  const handleConfirm = (win: boolean) => {
+    if (!marketIdValid || !mktSettlable || !onRightChain) return
+    setConfirmState({ marketId: marketIdNum, win })
+  }
+
+  const handleExecute = async () => {
+    if (!confirmState || !onRightChain) return
+    const target = confirmState.marketId
+    try {
+      const hash = await new Promise<string>((res, rej) => {
+        resolve(
+          {
+            address: PREDICTION_MARKET_ADDRESS,
+            abi: predictionMarketABI,
+            functionName: 'resolveMarket',
+            args: [BigInt(target), confirmState.win],
+          },
+          {
+            onSuccess: (h: `0x${string}`) => res(h),
+            onError: (e: any) => rej(new Error(e.shortMessage ?? e.message)),
+          }
+        )
+      })
+      setSucceed({ marketId: target, txHash: hash })
+      setConfirmState(null)
+      queryClient.invalidateQueries({ queryKey: ['readContract'] })
+      toast('结算交易已广播', 'info')
+    } catch (e: any) {
+      toast('交易失败: ' + (e.message || '未知错误'), 'error')
+    }
   }
 
   if (!address) {
@@ -199,7 +252,74 @@ export function Admin() {
           </CardContent>
         </Card>
       )}
-      {/* Task 5 注入：结算区（owner + operator） */}
+      <Card>
+        <CardHeader><CardTitle>市场结算</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted">输入 marketId，读取链上状态后选择获胜结果。交易前请逐项核对。结算实时链上校验：仅 Open 且已过 deadline 可结算。</p>
+          <Input
+            value={marketIdInput}
+            onChange={(e) => { setMarketIdInput(e.target.value); setConfirmState(null); setSucceed(null) }}
+            placeholder="输入 marketId，如 1"
+            className="max-w-sm font-mono text-xs"
+          />
+          {marketIdValid && mkt && (
+            <div className="space-y-1 rounded-lg bg-muted/10 p-3 text-xs">
+              <div><span className="text-muted">市场：</span>{(mkt[0] as string) ?? ''}</div>
+              <div>
+                <span className="text-muted">状态：</span>
+                {mktStatusLabel ?? '-'}
+                <Badge className="ml-2" variant={mktSettlable ? 'success' : 'secondary'}>
+                  {mktSettlable ? '可结算' : mktStatus === 1 ? '已结算' : mktStatus === 2 ? '已取消' : '未到截止时间'}
+                </Badge>
+              </div>
+            </div>
+          )}
+          {marketIdValid && mkt && (
+            <div className="flex gap-2">
+              <Button className="flex-1" variant="outline" disabled={!mktSettlable || isResolvePending || !onRightChain} onClick={() => handleConfirm(true)}>
+                结算 YES 胜
+              </Button>
+              <Button className="flex-1" variant="outline" disabled={!mktSettlable || isResolvePending || !onRightChain} onClick={() => handleConfirm(false)}>
+                结算 NO 胜
+              </Button>
+            </div>
+          )}
+          {!onRightChain && address && (
+            <p className="text-xs text-destructive">当前连接链 ({connectedChainId}) 与目标链 ({CHAIN_ID}) 不一致，操作已禁用。</p>
+          )}
+
+          {confirmState && (
+            <div className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-sm">
+              <p className="font-semibold text-amber-700">最终确认 — 请逐项核对后提交钱包：</p>
+              <ul className="list-disc pl-5 text-xs text-amber-800">
+                <li>操作钱包：{address}</li>
+                <li>目标链：{CHAIN_NAME}（{CHAIN_ID}）</li>
+                <li>合约地址：{PREDICTION_MARKET_ADDRESS}</li>
+                <li>操作：resolveMarket(marketId={confirmState.marketId}, result={confirmState.win ? 'TRUE(YES 胜)' : 'FALSE(NO 胜)'})</li>
+                <li>链上状态：{mktStatusLabel}（应 Open 且已过 deadline）</li>
+              </ul>
+              <div className="ml-1 flex gap-2">
+                <Button size="sm" disabled={isResolvePending} onClick={handleExecute}>
+                  {isResolvePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '确认并提交'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmState(null)}>取消</Button>
+              </div>
+            </div>
+          )}
+
+          {succeed && (
+            <div className="space-y-2 rounded-lg bg-muted/10 p-3 text-sm">
+              <p className="text-green-600">结算交易已广播：{succeed.txHash}</p>
+              <a href={`${EXPLORER_URL}/tx/${succeed.txHash}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline">
+                在区块浏览器查看
+              </a>
+              <p className="text-xs text-amber-600">
+                纠错提示：如结算结果有误，请用 owner 或备用 resolver key 调用 disputeResolve 纠正；若广播用的 key 已泄露，纠正后再 setResolver 撤销该 key。
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

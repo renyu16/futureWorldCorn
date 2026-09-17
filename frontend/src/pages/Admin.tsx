@@ -79,6 +79,12 @@ export function Admin() {
   const marketIdValid = /^\d+$/.test(marketIdInput.trim()) && marketIdNum >= 0
   const [confirmState, setConfirmState] = useState<null | { marketId: number; win: boolean }>(null)
   const [succeed, setSucceed] = useState<{ marketId: number; txHash: string } | null>(null)
+  const { data: marketCount } = useReadContract({
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketABI,
+    functionName: 'marketCount',
+  })
+  const marketExists = marketCount !== undefined && marketIdNum < Number(marketCount)
   const { data: mktData } = useReadContract({
     address: PREDICTION_MARKET_ADDRESS,
     abi: predictionMarketABI,
@@ -90,7 +96,7 @@ export function Admin() {
   const mktStatus = mkt ? Number(mkt[4]) : undefined
   const mktDeadline = mkt ? Number(mkt[3]) : undefined
   const mktDeadlinePassed = mktDeadline !== undefined && mktDeadline * 1000 < Date.now()
-  const mktSettlable = mktStatus === 0 && mktDeadlinePassed
+  const mktSettlable = marketExists && mktStatus === 0 && mktDeadlinePassed
   const mktStatusLabel = mktStatus !== undefined && mktDeadline !== undefined
     ? getMarketStatusLabel(mktStatus, mktDeadline)
     : undefined
@@ -264,14 +270,20 @@ export function Admin() {
           />
           {marketIdValid && mkt && (
             <div className="space-y-1 rounded-lg bg-muted/10 p-3 text-xs">
-              <div><span className="text-muted">市场：</span>{(mkt[0] as string) ?? ''}</div>
-              <div>
-                <span className="text-muted">状态：</span>
-                {mktStatusLabel ?? '-'}
-                <Badge className="ml-2" variant={mktSettlable ? 'success' : 'secondary'}>
-                  {mktSettlable ? '可结算' : mktStatus === 1 ? '已结算' : mktStatus === 2 ? '已取消' : '未到截止时间'}
-                </Badge>
-              </div>
+              {!marketExists ? (
+                <div><span className="text-muted">市场：</span><span className="text-destructive">不存在（marketId 超出当前市场数量）</span></div>
+              ) : (
+                <>
+                  <div><span className="text-muted">市场：</span>{(mkt[0] as string) ?? ''}</div>
+                  <div>
+                    <span className="text-muted">状态：</span>
+                    {mktStatusLabel ?? '-'}
+                    <Badge className="ml-2" variant={mktSettlable ? 'success' : 'secondary'}>
+                      {mktSettlable ? '可结算' : mktStatus === 1 ? '已结算' : mktStatus === 2 ? '已取消' : '未到截止时间'}
+                    </Badge>
+                  </div>
+                </>
+              )}
             </div>
           )}
           {marketIdValid && mkt && (
@@ -299,7 +311,7 @@ export function Admin() {
                 <li>链上状态：{mktStatusLabel}（应 Open 且已过 deadline）</li>
               </ul>
               <div className="ml-1 flex gap-2">
-                <Button size="sm" disabled={isResolvePending} onClick={handleExecute}>
+                <Button size="sm" disabled={isResolvePending || !mktSettlable} onClick={handleExecute}>
                   {isResolvePending ? <><Loader2 className="h-4 w-4 animate-spin" /> 确认中...</> : '确认并提交'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmState(null)}>取消</Button>
